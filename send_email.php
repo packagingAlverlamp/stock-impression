@@ -34,31 +34,9 @@ if (count($emails) === 0 || $subject === '' || $message === '') {
     exit;
 }
 
-// Seguridad: si se define la variable de entorno SEND_EMAIL_API_KEY, la petición
-// debe incluir esa clave en el header `X-API-KEY` o en el campo JSON `api_key`.
-$api_key_env = getenv('SEND_EMAIL_API_KEY');
-if ($api_key_env) {
-    $provided = '';
-    if (function_exists('getallheaders')) {
-        $hdrs = getallheaders();
-        foreach ($hdrs as $hk => $hv) {
-            if (strtolower($hk) === 'x-api-key') {
-                $provided = $hv;
-                break;
-            }
-        }
-    }
-    if (!$provided && isset($data['api_key'])) {
-        $provided = $data['api_key'];
-    }
-    if ($provided !== $api_key_env) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'No autorizado - API key inválida']);
-        exit;
-    }
-}
+// Versión mínima: no se requiere API key. Usar solo en entornos controlados.
 
-// From: cambia esto por una dirección de tu dominio para mejor entregabilidad
+// From: ajusta a una dirección válida de tu dominio para mejor entregabilidad
 $from = 'no-reply@tu-dominio.com';
 $headers = "From: " . $from . "\r\n";
 $headers .= "Reply-To: " . $from . "\r\n";
