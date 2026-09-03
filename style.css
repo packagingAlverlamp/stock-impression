@@ -578,8 +578,8 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
   /* push main shell to the right to make room for sidebar */
   #shell {
-    margin-left: 220px;
-    max-width: calc(100% - 220px);
+    margin-left: 360px;
+    max-width: calc(100% - 360px);
   }
 
   main.view { padding: 20px 28px 40px; }
@@ -633,7 +633,18 @@ nav.tabbar svg { width: 21px; height: 21px; }
   /* Keep mobile card look: column lists are vertical, cards fill column width */
   .category-column { flex: 0 0 var(--card-width); min-width: var(--card-width); }
   .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-  .column-list { display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 220px); overflow: auto; }
+  .column-list { display: block; max-height: calc(100vh - 220px); }
+
+  /* Desktop: when height exceeds, flow items into multiple columns inside each category */
+  @media (min-width: 900px) {
+    .column-list {
+      column-width: var(--card-width);
+      column-gap: 12px;
+      height: calc(100vh - 240px);
+      overflow: auto;
+    }
+    .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
+  }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
@@ -660,19 +671,22 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
 /* Desktop sidebar visual styling to match reference image (only desktop) */
 @media (min-width: 900px) {
+  :root { --sidebar-width: 300px; }
   nav.tabbar {
-    width: 300px;
-    padding: 14px;
+    position: fixed;
+    left: 18px;
+    top: 18px;
+    bottom: 18px;
+    width: var(--sidebar-width);
+    padding: 12px;
     border-radius: 10px;
-    margin: 18px 18px 18px 18px;
     background: #060606;
     border: 1px solid rgba(255,255,255,0.03);
     box-shadow: none;
-    min-height: calc(100vh - 36px);
     overflow: auto;
   }
-  nav.tabbar .sidebar-brand { padding: 12px 12px 10px; margin-bottom: 6px; }
-  nav.tabbar button { display: block; width: calc(100% - 24px); margin: 8px 12px; padding: 12px 14px; border-radius: 8px; background: transparent; color: #ddd; text-align: left; }
+  nav.tabbar .sidebar-brand { padding: 10px 12px 8px; margin-bottom: 6px; }
+  nav.tabbar button { display: flex; align-items: center; gap: 10px; width: calc(100% - 24px); margin: 6px 12px; padding: 8px 12px; border-radius: 8px; background: transparent; color: #ddd; text-align: left; font-size: 14px; }
   nav.tabbar button:first-child { background: rgba(255,255,255,0.02); font-weight:700; color: #fff; }
   nav.tabbar button.active {
     background: linear-gradient(90deg, rgba(0,160,122,0.06), rgba(0,160,122,0.03));
@@ -680,10 +694,11 @@ nav.tabbar svg { width: 21px; height: 21px; }
     color: var(--teal);
     padding-left: 12px;
   }
-  nav.tabbar button svg { margin-right: 12px; flex: 0 0 18px; }
+  nav.tabbar button svg { margin-right: 10px; flex: 0 0 18px; }
   nav.tabbar button:not(:first-child):not(.active)::after { content: '\276F'; float: right; color: rgba(255,255,255,0.34); }
-  /* Reserve bottom area for user box */
   nav.tabbar { padding-bottom: 80px; }
+  /* ensure shell leaves room for fixed sidebar */
+  #shell { margin-left: calc(var(--sidebar-width) + 36px); max-width: calc(100% - (var(--sidebar-width) + 36px)); }
 }
 
 /* Limit main view width so add/profile content sits within it */
