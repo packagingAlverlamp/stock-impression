@@ -2,11 +2,12 @@
 // STOCK-IMPRESIÓN — Lógica de la aplicación
 // ============================================================
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
+let activeCategoryFilter = '';
 let addScanner = null;
 let stockScanner = null;
 let stockScanMode = "out"; // "out" = sacar stock, "in" = añadir stock
@@ -77,7 +78,7 @@ $("form-login").addEventListener("submit", async (e) => {
   $("auth-error").classList.add("hidden");
   const email = $("login-email").value.trim();
   const password = $("login-password").value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) showAuthError("No se ha podido entrar: " + error.message);
 });
 
@@ -86,7 +87,7 @@ $("form-register").addEventListener("submit", async (e) => {
   $("auth-error").classList.add("hidden");
   const email = $("register-email").value.trim();
   const password = $("register-password").value;
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { error } = await supabaseClient.auth.signUp({ email, password });
   if (error) {
     showAuthError("No se ha podido crear la cuenta: " + error.message);
   } else {
@@ -97,10 +98,10 @@ $("form-register").addEventListener("submit", async (e) => {
 $("signout-btn").addEventListener("click", async () => {
   stopAddScanner();
   stopStockScanner();
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
 });
 
-supabase.auth.onAuthStateChange((_event, session) => {
+supabaseClient.auth.onAuthStateChange((_event, session) => {
   if (session && session.user) {
     currentUser = session.user;
     enterApp();
@@ -150,7 +151,7 @@ function showView(name) {
 // Perfil
 // ---------------------------------------------------------------
 async function loadProfile() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("profiles")
     .select("*")
     .eq("id", currentUser.id)
@@ -166,7 +167,7 @@ function renderProfile() {
 
 $("notify-toggle").addEventListener("change", async (e) => {
   const checked = e.target.checked;
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("profiles")
     .update({ notify_low_stock: checked })
     .eq("id", currentUser.id);
@@ -186,7 +187,7 @@ $("delete-account-btn").addEventListener("click", async () => {
   if (!sureAgain) return;
 
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseClient.auth.getSession();
     const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
@@ -207,7 +208,7 @@ $("delete-account-btn").addEventListener("click", async () => {
 // Inventario — carga y listado
 // ---------------------------------------------------------------
 async function loadProducts() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("products")
     .select("*")
     .order("name", { ascending: true });
@@ -245,6 +246,29 @@ function populateDatalists() {
   fill("list-suppliers", allProducts.map((p) => p.supplier));
   const defaultUnits = ["Rollo", "Paquete", "Cartucho", "Caja", "Bote", "Unidad"];
   fill("list-units", [...defaultUnits, ...allProducts.map((p) => p.unit)]);
+  renderCategoryPills();
+}
+
+function renderCategoryPills() {
+  const container = $("category-pills");
+  if (!container) return;
+  const cats = [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort();
+  const items = ["Todos", ...cats];
+  container.innerHTML = items
+    .map((c) => {
+      const active = (c === "Todos" ? activeCategoryFilter === '' : activeCategoryFilter === c);
+      return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}${c!="Todos"?` <span class=\"count\">${allProducts.filter(p=>p.category===c).length}</span>`:''}</button>`;
+    })
+    .join("");
+
+  container.querySelectorAll('.pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.cat === 'Todos' ? '' : btn.dataset.cat;
+      activeCategoryFilter = cat;
+      renderCategoryPills();
+      renderProductList();
+    });
+  });
 }
 
 $("search-input").addEventListener("input", () => renderProductList());
@@ -258,6 +282,11 @@ function renderProductList() {
       .some((f) => f.toLowerCase().includes(term));
   });
 
+  // apply active category filter
+  const finalFiltered = activeCategoryFilter
+    ? filtered.filter((p) => p.category === activeCategoryFilter)
+    : filtered;
+
   const container = $("product-list");
   $("list-empty").classList.toggle("hidden", allProducts.length > 0);
 
@@ -266,15 +295,15 @@ function renderProductList() {
     return;
   }
 
-  container.innerHTML = filtered
+  container.innerHTML = finalFiltered
     .map((p) => {
       const low = isLowStock(p);
       const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(" / ");
       return `
         <div class="product-row ${low ? "low" : ""}">
           <div class="product-main" data-id="${p.id}">
-            <h3>${escapeHtml(p.name)}</h3>
-            <p class="product-meta">${escapeHtml(meta || p.category || "")}</p>
+            <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
+            <p class="product-meta">${escapeHtml(meta)}</p>
             <span class="product-qty ${low ? "low" : ""}">${p.quantity} / mín. ${p.min_quantity}</span>
             ${low ? '<span class="low-flag">Queda poco</span>' : ""}
           </div>
@@ -307,7 +336,7 @@ async function applyQuantityDelta(product, delta) {
 }
 
 async function updateProductQuantity(productId, newQty) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("products")
     .update({ quantity: newQty })
     .eq("id", productId)
@@ -326,9 +355,9 @@ async function checkLowStock(product) {
   const low = isLowStock(product);
   if (low && !product.low_stock_notified) {
     await sendLowStockEmail(product);
-    await supabase.from("products").update({ low_stock_notified: true }).eq("id", product.id);
+    await supabaseClient.from("products").update({ low_stock_notified: true }).eq("id", product.id);
   } else if (!low && product.low_stock_notified) {
-    await supabase.from("products").update({ low_stock_notified: false }).eq("id", product.id);
+    await supabaseClient.from("products").update({ low_stock_notified: false }).eq("id", product.id);
   }
 }
 
@@ -337,7 +366,7 @@ async function sendLowStockEmail(product) {
     // Prefer EmailJS if configured (no server required)
     const useEmailJS = typeof EMAILJS_SERVICE_ID !== 'undefined' && EMAILJS_SERVICE_ID;
 
-    const { data: profiles } = await supabase
+    const { data: profiles } = await supabaseClient
       .from("profiles")
       .select("email, notify_low_stock")
       .eq("notify_low_stock", true);
@@ -464,7 +493,7 @@ function openEditModal(productId) {
       quantity: Number($("edit-quantity").value),
       min_quantity: Number($("edit-min").value),
     };
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("products")
       .update(updated)
       .eq("id", p.id)
@@ -483,7 +512,7 @@ function openEditModal(productId) {
   backdrop.querySelector("#edit-delete-btn").addEventListener("click", async () => {
     const sure = confirm(`¿Eliminar "${p.name}" del inventario?`);
     if (!sure) return;
-    const { error } = await supabase.from("products").delete().eq("id", p.id);
+    const { error } = await supabaseClient.from("products").delete().eq("id", p.id);
     if (error) {
       showToast("Error al eliminar");
       return;
@@ -546,7 +575,7 @@ $("form-add-product").addEventListener("submit", async (e) => {
     min_quantity: Number($("add-min").value),
   };
 
-  const { data, error } = await supabase.from("products").insert(payload).select().single();
+  const { data, error } = await supabaseClient.from("products").insert(payload).select().single();
   if (error) {
     if (error.message.includes("duplicate")) {
       showToast("Ya existe un suministro con ese código EAN");
