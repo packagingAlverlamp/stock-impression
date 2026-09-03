@@ -614,9 +614,9 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
 /* Columns layout */
 .columns-wrap { display: flex; gap: 18px; }
-.category-column { flex: 1 1 0; min-width: 220px; }
+.category-column { flex: 0 0 260px; min-width: 260px; }
 .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-.column-list { display: grid; grid-auto-rows: min-content; gap: 12px; }
+.column-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
@@ -627,4 +627,10 @@ nav.tabbar svg { width: 21px; height: 21px; }
     border-radius: 8px;
     max-height: 90vh;
   }
+}
+
+/* Ensure card width is consistent */
+@media (min-width: 900px) {
+  .product-row { width: 100%; max-width: 260px; }
+  .columns-wrap { flex-wrap: wrap; }
 }

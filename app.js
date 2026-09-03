@@ -379,7 +379,10 @@ function renderProductList() {
   }
 
   container.querySelectorAll(".product-main").forEach((el) => {
-    el.addEventListener("click", () => openEditModal(el.dataset.id));
+    el.addEventListener("click", () => {
+      const id = el.dataset.id || el.closest('.product-row')?.dataset.id;
+      if (id) openEditModal(id);
+    });
   });
   container.querySelectorAll(".qty-stepper button").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -489,6 +492,7 @@ function openEditModal(productId) {
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
+  if (window.innerWidth >= 900) backdrop.classList.add('centered');
   backdrop.innerHTML = `
     <div class="modal-sheet">
       <div class="modal-header">
