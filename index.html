@@ -203,6 +203,16 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script src="config.js"></script>
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  // Initialize EmailJS if public key is present in config.js
+  if (typeof EMAILJS_PUBLIC_KEY !== 'undefined' && EMAILJS_PUBLIC_KEY) {
+    if (window.emailjs && typeof window.emailjs.init === 'function') {
+      try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch (e) { /* ignore */ }
+    }
+  }
+</script>
 <script src="app.js"></script>
 </body>
 </html>

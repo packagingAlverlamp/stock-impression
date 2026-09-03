@@ -56,6 +56,7 @@ supabase functions deploy delete-account
 No hace falta configurar ninguna clave adicional: Supabase inyecta
 automáticamente los permisos necesarios en la función.
 
+
 ---
 
 ## 3. Configurar el envío de emails (gratis, con tu Gmail)
@@ -141,3 +142,50 @@ genera solo, sin coste.
 - **Instalar como app en el móvil**: aunque no es una app nativa, puedes
   abrir la web en Chrome/Safari y usar "Añadir a pantalla de inicio" para
   tenerla como un icono más, a modo de acceso directo.
+
+---
+
+## Endpoint de envío de emails (serverless)
+
+Se ha añadido un endpoint serverless en `api/send-email.js` para enviar
+correos usando SendGrid. Es una alternativa rápida al Apps Script de
+Google y se despliega junto con la web en Vercel.
+
+Pasos para activar:
+
+- En Vercel (Project → Settings → Environment Variables) añade:
+   - `SENDGRID_API_KEY` — tu clave de API de SendGrid
+   - `SENDGRID_FROM` — email remitente (opcional, por defecto: `noreply@yourdomain.com`)
+
+- Opcional: cambia `APPS_SCRIPT_URL` en `config.js` a `/api/send-email`
+   para que la aplicación use el endpoint servidor en vez de Apps Script.
+
+Alternativa sin servidor: EmailJS (recomendado si no quieres gestionar API keys)
+
+- EmailJS permite enviar emails directamente desde el frontend sin servidor.
+  1. Regístrate en https://www.emailjs.com y crea un `Service` y una `Template`.
+  2. En la plantilla, añade variables: `to_email`, `subject`, `message`, `product_name`, `quantity`, `min_quantity`.
+  3. En Vercel (Project → Settings → Environment Variables) añade:
+     - `EMAILJS_SERVICE_ID` — el ID de tu Service (ej. `service_xxx`) (Config)
+     - `EMAILJS_TEMPLATE_ID` — el ID de la plantilla (ej. `template_xxx`) (Config)
+     - `EMAILJS_PUBLIC_KEY` — tu public key / user id (Secret)
+  4. La app ya viene preparada para usar EmailJS cuando estas variables están presentes.
+
+Prueba básica con EmailJS: no necesitas curl — una vez añadido en Vercel, la app enviará los avisos automáticamente. Si quieres probar manualmente desde la consola, puedes usar la interfaz de EmailJS o una petición desde el navegador que imite la plantilla.
+
+- Haz commit y push; Vercel desplegará automáticamente y expondrá
+   `/api/send-email` en tu dominio.
+
+Prueba básica desde terminal (JSON esperado: `to`, `subject`, `text` or `html`):
+
+```bash
+curl -X POST https://stock-impresion.vercel.app/api/send-email \
+   -H 'Content-Type: application/json' \
+   -d '{"to":["tu@email.com"],"subject":"Prueba","text":"Hola"}'
+```
+
+Si prefieres que lo gestione yo, indícame si quieres:
+
+- Que prepare el commit con `config.js` apuntando al endpoint y lo empuje (necesitas añadir la variable `SENDGRID_API_KEY` en Vercel antes de probar).
+- O que use otro proveedor (Mailgun, SMTP) — en ese caso dame preferencia.
+

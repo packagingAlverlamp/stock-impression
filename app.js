@@ -334,25 +334,53 @@ async function checkLowStock(product) {
 
 async function sendLowStockEmail(product) {
   try {
-    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) return;
+    // Prefer EmailJS if configured (no server required)
+    const useEmailJS = typeof EMAILJS_SERVICE_ID !== 'undefined' && EMAILJS_SERVICE_ID;
 
     const { data: profiles } = await supabase
       .from("profiles")
       .select("email, notify_low_stock")
       .eq("notify_low_stock", true);
 
-    const emails = (profiles || []).map((p) => p.email);
+    const emails = (profiles || []).map((p) => p.email).filter(Boolean);
     if (emails.length === 0) return;
+
+    const subject = `Stock bajo: ${product.name}`;
+    const message =
+      `El suministro "${product.name}" tiene ${product.quantity} ${product.unit || "unidades"} ` +
+      `(mínimo definido: ${product.min_quantity}).\n\nRepón stock cuando puedas.\n\n— Stock Impresión`;
+
+    if (useEmailJS && window.emailjs && typeof window.emailjs.send === 'function') {
+      // send individual emails via EmailJS (template should accept 'to_email', 'subject', 'message')
+      const promises = emails.map((to) => {
+        const templateParams = {
+          to_email: to,
+          subject,
+          message,
+          product_name: product.name,
+          quantity: product.quantity,
+          min_quantity: product.min_quantity,
+        };
+        try {
+          return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      });
+      await Promise.all(promises);
+      return;
+    }
+
+    // Fallback: use APPS_SCRIPT_URL (Google Apps Script or your PHP endpoint)
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) return;
 
     await fetch(APPS_SCRIPT_URL, {
       method: "POST",
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         emails,
-        subject: `Stock bajo: ${product.name}`,
-        message:
-          `El suministro "${product.name}" tiene ${product.quantity} ${product.unit || "unidades"} ` +
-          `(mínimo definido: ${product.min_quantity}).\n\n` +
-          `Repón stock cuando puedas.\n\n— Stock Impresión`,
+        subject,
+        message,
       }),
     });
   } catch (err) {
