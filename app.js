@@ -36,6 +36,26 @@ function showToast(msg, ms = 3200) {
   showToast._t = setTimeout(() => el.classList.add("hidden"), ms);
 }
 
+/* Enhance sidebar on desktop: add brand block and ensure scan is hidden */
+function enhanceSidebar() {
+  const nav = document.querySelector('nav.tabbar');
+  if (!nav) return;
+  const isDesktop = window.innerWidth >= 900;
+  const existing = nav.querySelector('.sidebar-brand');
+  if (isDesktop && !existing) {
+    const brand = document.createElement('div');
+    brand.className = 'sidebar-brand';
+    brand.innerHTML = `<div style="padding:16px 12px 8px;color:var(--paper)"><div style="font-weight:700;font-size:18px">Stock Impresión</div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px">Inventario</div></div>`;
+    nav.insertAdjacentElement('afterbegin', brand);
+  } else if (!isDesktop && existing) {
+    existing.remove();
+  }
+}
+
+window.addEventListener('resize', () => enhanceSidebar());
+// run once on load
+setTimeout(enhanceSidebar, 120);
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return "";
   return String(str)
