@@ -418,7 +418,7 @@ h2.section-title {
   padding: 18px;
   margin-bottom: 16px;
 }
-.profile-email { font-weight: 700; font-size: 15.5px; margin-bottom: 2px; font-family: var(--font-body); }
+.profile-email { font-weight: 600; font-size: 15.5px; margin-bottom: 2px; }
 .profile-sub { color: var(--ink-soft); font-size: 13px; margin-bottom: 16px; }
 
 .switch-row {
@@ -491,9 +491,8 @@ h2.section-title {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
-.modal-header h2 { margin: 0; font-family: var(--font-body); font-size: 19px; font-weight: 700; }
-.modal-header {
 }
+.modal-header h2 { margin: 0; font-family: var(--font-body); font-size: 19px; font-weight:700; }
 .modal-close {
   background: none; border: none; font-size: 22px; color: var(--ink-soft); cursor: pointer; line-height: 1;
 }
@@ -553,19 +552,28 @@ nav.tabbar svg { width: 21px; height: 21px; }
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    padding-top: 18px;
+    padding-top: 8px;
     border-top: none;
     border-right: 1px solid rgba(0,0,0,0.06);
     background: #0b0b0b;
     z-index: 60;
   }
+  /* Sidebar: tidy list layout */
+  nav.tabbar .sidebar-brand { padding: 18px 16px 10px; }
   nav.tabbar button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     justify-content: flex-start;
-    padding: 14px 12px;
-    gap: 10px;
+    padding: 12px 18px;
+    color: rgba(255,255,255,0.92);
+    border: none;
+    background: transparent;
     text-align: left;
+    font-weight: 600;
   }
-  nav.tabbar svg { margin-right: 6px; }
+  nav.tabbar button svg { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; }
+  nav.tabbar button:hover { background: rgba(255,255,255,0.02); }
 
   /* push main shell to the right to make room for sidebar */
   #shell {
@@ -580,24 +588,18 @@ nav.tabbar svg { width: 21px; height: 21px; }
   /* Hide scan tab on desktop */
   nav.tabbar button[data-view="scan"] { display: none; }
 
-  /* Product grid: 4 columns */
-  #product-list {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    align-items: start;
-  }
+
+  /* Keep mobile card layout on desktop; grouping handled with columns-wrap */
+  #product-list { display: block; }
 
   .product-row {
     display: flex;
-    flex-direction: column;
     border: 1px solid var(--line);
-    border-left: none;
+    border-left: 4px solid var(--ink);
     background: var(--surface);
-    margin: 0;
-    border-radius: 8px;
-    overflow: visible;
-    min-height: 120px;
+    margin: 0 0 10px 0;
+    border-radius: 2px;
+    overflow: hidden;
   }
 
   .product-main { padding: 14px; }
@@ -615,9 +617,10 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
 /* Columns layout */
 .columns-wrap { display: flex; gap: 18px; }
-.category-column { flex: 0 0 260px; min-width: 260px; }
-.col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-.column-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  /* Keep mobile card look: column lists are vertical, cards fill column width */
+  .category-column { flex: 1 1 0; min-width: 260px; }
+  .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
+  .column-list { display: flex; flex-direction: column; gap: 12px; }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
@@ -632,29 +635,14 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
 /* Ensure card width is consistent */
 @media (min-width: 900px) {
-  .product-row { width: 100%; max-width: 260px; }
-  .columns-wrap { flex-wrap: wrap; }
+  .product-row { width: 100%; max-width: none; }
+  .columns-wrap { flex-wrap: nowrap; }
 }
 
-/* USER OVERRIDES: force mobile-style cards on desktop, form/profile sizing, and tidy sidebar */
+/* Desktop form/profile constraints */
 @media (min-width: 900px) {
-  /* Make product list behave like mobile (single-column cards) */
-  #product-list { display: block !important; }
-  .columns-wrap { display: block !important; }
-  .category-column { width: 100% !important; min-width: 0 !important; }
-  .column-list { display: block !important; grid-template-columns: none !important; }
-  .product-row { width: 100% !important; max-width: none !important; border-left: 4px solid var(--ink) !important; border-radius: 2px !important; margin-bottom: 10px !important; }
-  .product-main { padding: 12px 13px !important; }
-  .qty-stepper { flex-direction: column !important; border-left: 1px solid var(--line) !important; border-top: none !important; }
-
-  /* Sidebar tidy: icons and labels inline, consistent spacing */
-  nav.tabbar button { display: inline-flex; align-items: center; gap: 12px; padding: 12px 18px; color: rgba(255,255,255,0.95); }
-  nav.tabbar .sidebar-brand { padding: 18px 16px; }
-
-  /* Limit form widths */
-  #form-add-product { max-width: 900px; margin-left: auto; margin-right: auto; }
-
-  /* Profile: limit widths and buttons */
+  #view-add form, #form-add-product { max-width: 900px; margin-left: auto; margin-right: auto; }
   #view-profile .profile-card { max-width: 900px; margin-left: auto; margin-right: auto; }
-  #view-profile .btn { width: auto; min-width: 160px; }
+  #view-profile .btn { width: auto; display: inline-block; }
+  .danger-zone { max-width: 900px; margin-left: auto; margin-right: auto; }
 }
