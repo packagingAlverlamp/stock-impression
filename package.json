@@ -1,0 +1,8 @@
+{
+  "name": "stock-impresion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/generate-config.js && mkdir -p public && cp index.html app.js style.css public/"
+  }
+}
