@@ -304,7 +304,7 @@ function renderProductList() {
           <div class="product-main" data-id="${p.id}">
             <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
             <p class="product-meta">${escapeHtml(meta)}</p>
-            <span class="product-qty ${low ? "low" : ""}">${p.quantity} / mín. ${p.min_quantity}</span>
+            <span class="product-qty ${low ? "low" : ""}">${p.quantity}</span>
             ${low ? '<span class="low-flag">Queda poco</span>' : ""}
           </div>
           <div class="qty-stepper">
