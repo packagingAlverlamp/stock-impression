@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Stock Impresión</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="shell">
+
+  <!-- ======================= AUTENTICACIÓN ======================= -->
+  <div id="view-auth">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <h1>Stock Impresión</h1>
+      <p>Control de suministros del taller</p>
+    </div>
+
+    <div id="auth-error" class="error-msg hidden"></div>
+
+    <!-- Formulario de inicio de sesión -->
+    <form id="form-login">
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" required autocomplete="email" />
+      </div>
+      <div class="field">
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </form>
+
+    <!-- Formulario de registro -->
+    <form id="form-register" class="hidden">
+      <div class="field">
+        <label for="register-email">Email</label>
+        <input type="email" id="register-email" required autocomplete="email" />
+      </div>
+      <div class="field">
+        <label for="register-password">Contraseña</label>
+        <input type="password" id="register-password" required minlength="6" autocomplete="new-password" />
+      </div>
+      <button type="submit" class="btn btn-teal">Crear cuenta</button>
+    </form>
+
+    <p class="auth-switch">
+      <span id="switch-to-register-wrap">¿No tienes cuenta? <button type="button" id="switch-to-register">Regístrate</button></span>
+      <span id="switch-to-login-wrap" class="hidden">¿Ya tienes cuenta? <button type="button" id="switch-to-login">Entra</button></span>
+    </p>
+  </div>
+
+  <!-- ======================= APP (tras iniciar sesión) ======================= -->
+  <div id="app" class="hidden">
+
+    <header class="topbar">
+      <h1>Stock Impresión</h1>
+      <span id="low-stock-badge" class="badge-alert hidden"></span>
+    </header>
+
+    <!-- ---------- Vista: Inventario ---------- -->
+    <main id="view-list" class="view">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Buscar por nombre, categoría, ubicación..." />
+      </div>
+      <div id="product-list"></div>
+      <div id="list-empty" class="empty-state hidden">
+        <p>Aún no hay ningún suministro registrado.</p>
+        <button class="btn btn-teal" id="empty-add-btn" style="max-width:220px;margin:0 auto">Añadir el primero</button>
+      </div>
+    </main>
+
+    <!-- ---------- Vista: Añadir producto ---------- -->
+    <main id="view-add" class="view hidden">
+      <h2 class="section-title">Añadir suministro</h2>
+
+      <button type="button" class="scan-inline-btn" id="add-scan-ean-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
+        Escanear código EAN
+      </button>
+      <div id="add-scanner" class="hidden" style="margin-bottom:16px"></div>
+
+      <form id="form-add-product">
+        <div class="field">
+          <label for="add-ean">Código EAN (opcional)</label>
+          <input type="text" id="add-ean" inputmode="numeric" placeholder="Ej: 8412345678901" />
+        </div>
+        <div class="field">
+          <label for="add-name">Nombre del suministro *</label>
+          <input type="text" id="add-name" required placeholder="Ej: Papel fotográfico A4" />
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label for="add-category">Categoría</label>
+            <input type="text" id="add-category" list="list-categories" placeholder="Ej: Papel" />
+            <datalist id="list-categories"></datalist>
+          </div>
+          <div class="field">
+            <label for="add-unit">Formato</label>
+            <input type="text" id="add-unit" list="list-units" placeholder="Rollo, Paquete..." />
+            <datalist id="list-units"></datalist>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label for="add-location">Ubicación</label>
+            <input type="text" id="add-location" list="list-locations" placeholder="Ej: Almacén 2" />
+            <datalist id="list-locations"></datalist>
+          </div>
+          <div class="field">
+            <label for="add-supplier">Proveedor</label>
+            <input type="text" id="add-supplier" list="list-suppliers" placeholder="Ej: Epson" />
+            <datalist id="list-suppliers"></datalist>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="field">
+            <label for="add-quantity">Cantidad actual *</label>
+            <input type="number" id="add-quantity" required min="0" step="1" value="0" />
+          </div>
+          <div class="field">
+            <label for="add-min">Cantidad mínima *</label>
+            <input type="number" id="add-min" required min="0" step="1" value="1" />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar suministro</button>
+      </form>
+    </main>
+
+    <!-- ---------- Vista: Escanear ---------- -->
+    <main id="view-scan" class="view hidden">
+      <h2 class="section-title">Escanear</h2>
+
+      <div class="mode-toggle">
+        <button type="button" id="mode-out-btn" class="active out">Sacar stock</button>
+        <button type="button" id="mode-in-btn" class="in">Añadir stock</button>
+      </div>
+
+      <div id="qr-reader"></div>
+      <p class="scan-hint" id="scan-hint">Apunta con la cámara al código de barras del producto</p>
+
+      <div id="scan-result" class="hidden"></div>
+    </main>
+
+    <!-- ---------- Vista: Perfil ---------- -->
+    <main id="view-profile" class="view hidden">
+      <h2 class="section-title">Mi perfil</h2>
+
+      <div class="profile-card">
+        <div class="profile-email" id="profile-email">-</div>
+        <div class="profile-sub">Miembro del inventario compartido</div>
+
+        <div class="switch-row">
+          <div>
+            <span class="switch-title">Avisos de stock bajo</span>
+            <span class="switch-desc">Recibir un email cuando un suministro llegue al mínimo</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="notify-toggle" />
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-outline" id="signout-btn" style="margin-bottom:20px">Cerrar sesión</button>
+
+      <div class="danger-zone">
+        <h3>Eliminar cuenta</h3>
+        <p>Se borrará tu registro permanentemente. Los suministros del inventario compartido no se ven afectados.</p>
+        <button type="button" class="btn btn-red" id="delete-account-btn">Eliminar mi cuenta</button>
+      </div>
+    </main>
+
+    <!-- ---------- Navegación inferior ---------- -->
+    <nav class="tabbar">
+      <button type="button" class="tab-btn active" data-view="list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Inventario
+      </button>
+      <button type="button" class="tab-btn" data-view="add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        Añadir
+      </button>
+      <button type="button" class="tab-btn" data-view="scan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
+        Escanear
+      </button>
+      <button type="button" class="tab-btn" data-view="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+        Perfil
+      </button>
+    </nav>
+
+  </div>
+
+  <div id="toast" class="hidden"></div>
+</div>
+
+<!-- Librerías -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
