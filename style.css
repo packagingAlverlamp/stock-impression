@@ -15,6 +15,7 @@
   --font-display: "IBM Plex Slab", serif;
   --font-body: "IBM Plex Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
+  --card-width: 480px;
 }
 
 * { box-sizing: border-box; }
@@ -600,27 +601,39 @@ nav.tabbar svg { width: 21px; height: 21px; }
     margin: 0 0 10px 0;
     border-radius: 2px;
     overflow: hidden;
+    width: 100%;
   }
 
   .product-main { padding: 14px; }
 
+  /* Keep qty-stepper vertical like mobile and make it take full card height */
+  .product-row { align-items: stretch; }
+  .product-main { flex: 1 1 auto; }
   .qty-stepper {
-    flex-direction: row;
-    border-top: 1px solid var(--line);
-    border-left: 0;
-    padding: 8px;
-    gap: 8px;
-    justify-content: flex-end;
+    display: flex;
+    flex-direction: column;
+    width: 44px;
+    border-left: 1px solid var(--line);
   }
-  .qty-stepper button { width: 40px; height: 36px; }
+  .qty-stepper button {
+    flex: 1 1 0;
+    width: 100%;
+    border: none;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .qty-stepper button:first-child { border-bottom: 1px solid var(--line); }
 }
 
 /* Columns layout */
 .columns-wrap { display: flex; gap: 18px; }
   /* Keep mobile card look: column lists are vertical, cards fill column width */
-  .category-column { flex: 1 1 0; min-width: 260px; }
+  .category-column { flex: 0 0 var(--card-width); min-width: var(--card-width); }
   .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-  .column-list { display: flex; flex-direction: column; gap: 12px; }
+  .column-list { display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 220px); overflow: auto; }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
@@ -637,6 +650,11 @@ nav.tabbar svg { width: 21px; height: 21px; }
 @media (min-width: 900px) {
   .product-row { width: 100%; max-width: none; }
   .columns-wrap { flex-wrap: nowrap; }
+}
+
+/* Limit main view width so add/profile content sits within it */
+@media (min-width: 900px) {
+  main.view { max-width: 900px; margin-left: auto; margin-right: auto; }
 }
 
 /* Desktop form/profile constraints */
