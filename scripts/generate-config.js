@@ -3,7 +3,7 @@ const path = require('path');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'PEGA_AQUI_TU_SUPABASE_URL';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'PEGA_AQUI_TU_SUPABASE_ANON_KEY';
-const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || 'PEGA_AQUI_TU_URL_DE_ENPOINT_DE_EMAIL';
+const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '/api/send-email';
 const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || '';
 const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || '';
 const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || '';

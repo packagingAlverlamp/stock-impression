@@ -1,7 +1,7 @@
 // Auto-generated config.js — do not edit by hand
-const SUPABASE_URL = " git push";
-const SUPABASE_ANON_KEY = "https://stock-impresion.vercel.app";
-const APPS_SCRIPT_URL = "stock-impresion.vercel.app";
-const EMAILJS_SERVICE_ID = "service_ln4u73v";
-const EMAILJS_TEMPLATE_ID = "template_w6ubpn4";
-const EMAILJS_PUBLIC_KEY = "WJ8DRkkTFsd2wnviw";
+const SUPABASE_URL = "PEGA_AQUI_TU_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "PEGA_AQUI_TU_SUPABASE_ANON_KEY";
+const APPS_SCRIPT_URL = "/api/send-email";
+const EMAILJS_SERVICE_ID = "";
+const EMAILJS_TEMPLATE_ID = "";
+const EMAILJS_PUBLIC_KEY = "";
