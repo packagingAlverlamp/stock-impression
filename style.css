@@ -611,3 +611,20 @@ nav.tabbar svg { width: 21px; height: 21px; }
   }
   .qty-stepper button { width: 40px; height: 36px; }
 }
+
+/* Columns layout */
+.columns-wrap { display: flex; gap: 18px; }
+.category-column { flex: 1 1 0; min-width: 220px; }
+.col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
+.column-list { display: grid; grid-auto-rows: min-content; gap: 12px; }
+
+/* Modal centered on desktop */
+@media (min-width: 900px) {
+  .modal-backdrop { align-items: center; padding: 30px; }
+  .modal-sheet {
+    width: 820px;
+    max-width: calc(100% - 80px);
+    border-radius: 8px;
+    max-height: 90vh;
+  }
+}
