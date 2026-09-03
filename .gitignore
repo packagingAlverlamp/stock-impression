@@ -1,5 +1,6 @@
 # Ignore local config with secrets
-config.js
+# config.js is generated at build time and should be available in deployments.
+# If it contains secrets, use env vars instead and do not commit them.
 
 # macOS
 .DS_Store
@@ -18,3 +19,5 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.vercel
+.env*

@@ -16,6 +16,13 @@ const content = `// Auto-generated config.js — do not edit by hand\n` +
 `const EMAILJS_TEMPLATE_ID = ${JSON.stringify(EMAILJS_TEMPLATE_ID)};\n` +
 `const EMAILJS_PUBLIC_KEY = ${JSON.stringify(EMAILJS_PUBLIC_KEY)};\n`;
 
-const outPath = path.join(process.cwd(), 'config.js');
+// Prefer writing into `public/` when it exists so static deployments include it
+const publicDir = path.join(process.cwd(), 'public');
+let outPath;
+if (fs.existsSync(publicDir) && fs.statSync(publicDir).isDirectory()) {
+	outPath = path.join(publicDir, 'config.js');
+} else {
+	outPath = path.join(process.cwd(), 'config.js');
+}
 fs.writeFileSync(outPath, content, 'utf8');
 console.log('Generated config.js at', outPath);
