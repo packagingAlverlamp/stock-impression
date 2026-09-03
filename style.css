@@ -1,15 +1,16 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Slab:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap");
 
 :root {
-  --ink: #1e2a3a;
-  --ink-soft: #5b6472;
-  --paper: #ece7dc;
+  /* Palette tuned towards alverlamp: dark accents and teal highlights */
+  --ink: #0b0b0b;
+  --ink-soft: #6b7176;
+  --paper: #ffffff;
   --surface: #ffffff;
-  --line: #d8d2c2;
+  --line: #e6e6e6;
   --red: #b23a2e;
-  --red-soft: #f3e2df;
-  --teal: #2d6e7e;
-  --green: #3f6b4f;
+  --red-soft: #fdecea;
+  --teal: #00a07a;
+  --green: #0f8b66;
 
   --font-display: "IBM Plex Slab", serif;
   --font-body: "IBM Plex Sans", sans-serif;
@@ -198,11 +199,12 @@ main.view {
 /* ---------- Product list ---------- */
 .search-row input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 12px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 3px;
-  margin-bottom: 14px;
+  border-radius: 28px;
+  margin-bottom: 12px;
+  box-shadow: none;
 }
 
 /* Category pills under the search input */
@@ -216,21 +218,23 @@ main.view {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-  border-radius: 999px;
+  padding: 8px 12px;
+  background: #0b0b0b;
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #fff;
+  border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
+  opacity: .88;
 }
 .pill.active {
-  background: var(--teal);
-  color: #fff;
+  background: transparent;
+  color: var(--teal);
   border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(0,160,122,0.06) inset;
 }
 .pill .count {
-  background: rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.06);
   padding: 2px 6px;
   border-radius: 999px;
   font-size: 12px;
@@ -498,8 +502,8 @@ nav.tabbar {
   position: sticky;
   bottom: 0;
   display: flex;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: #0b0b0b;
 }
 nav.tabbar button {
   flex: 1;
@@ -510,11 +514,11 @@ nav.tabbar button {
   padding: 10px 4px 12px;
   border: none;
   background: none;
-  color: var(--ink-soft);
+  color: rgba(255,255,255,0.85);
   cursor: pointer;
   font-size: 11.5px;
 }
-nav.tabbar button.active { color: var(--ink); }
+nav.tabbar button.active { color: var(--teal); }
 nav.tabbar svg { width: 21px; height: 21px; }
 
 /* ---------- Toast ---------- */
