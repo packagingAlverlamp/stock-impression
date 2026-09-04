@@ -272,12 +272,6 @@ main.view {
   font-size: 14px;
   font-weight: 600;
 }
-.product-qty-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
 .product-qty.low { color: var(--red); }
 .low-flag {
   display: inline-flex;
@@ -286,7 +280,7 @@ main.view {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--red);
-  margin-left: 0;
+  margin-left: 8px;
 }
 .low-flag::before {
   content: "";
@@ -558,7 +552,7 @@ nav.tabbar svg { width: 21px; height: 21px; }
     width: 220px;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     padding-top: 8px;
     border-top: none;
     border-right: 1px solid rgba(0,0,0,0.06);
@@ -568,21 +562,16 @@ nav.tabbar svg { width: 21px; height: 21px; }
   /* Sidebar: tidy list layout */
   nav.tabbar .sidebar-brand { padding: 18px 16px 10px; }
   nav.tabbar button {
-    display: inline-flex;
-    flex: none;
-    width: auto;
-    align-self: flex-start;
+    display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     justify-content: flex-start;
-    margin: 4px 12px 0;
-    padding: 10px 14px;
+    padding: 12px 18px;
     color: rgba(255,255,255,0.92);
     border: none;
     background: transparent;
     text-align: left;
     font-weight: 600;
-    border-radius: 10px;
   }
   nav.tabbar button svg { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; }
   nav.tabbar button:hover { background: rgba(255,255,255,0.02); }
@@ -656,6 +645,8 @@ nav.tabbar svg { width: 21px; height: 21px; }
     }
     .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
   }
+  /* When a category needs two columns, expand the category column width to show both side-by-side */
+  .category-column.multi-column { flex: 0 0 calc(var(--card-width) * 2 + 12px); min-width: calc(var(--card-width) * 2 + 12px); }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
@@ -685,12 +676,12 @@ nav.tabbar svg { width: 21px; height: 21px; }
   :root { --sidebar-width: 300px; }
   nav.tabbar {
     position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    left: 18px;
+    top: 18px;
+    bottom: 18px;
     width: var(--sidebar-width);
-    padding: 0;
-    border-radius: 0;
+    padding: 12px;
+    border-radius: 10px;
     background: #060606;
     border: 1px solid rgba(255,255,255,0.03);
     box-shadow: none;
