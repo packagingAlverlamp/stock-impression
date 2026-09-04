@@ -1,19 +1,21 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Slab:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap");
 
 :root {
-  --ink: #1e2a3a;
-  --ink-soft: #5b6472;
-  --paper: #ece7dc;
+  /* Palette tuned towards alverlamp: dark accents and teal highlights */
+  --ink: #0b0b0b;
+  --ink-soft: #6b7176;
+  --paper: #ffffff;
   --surface: #ffffff;
-  --line: #d8d2c2;
+  --line: #e6e6e6;
   --red: #b23a2e;
-  --red-soft: #f3e2df;
-  --teal: #2d6e7e;
-  --green: #3f6b4f;
+  --red-soft: #fdecea;
+  --teal: #00a07a;
+  --green: #0f8b66;
 
   --font-display: "IBM Plex Slab", serif;
   --font-body: "IBM Plex Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
+  --card-width: 480px;
 }
 
 * { box-sizing: border-box; }
@@ -81,8 +83,8 @@ a { color: var(--teal); }
 .brand-mark::after { left: 50%; top: -6px; bottom: -6px; width: 1px; transform: translateX(-50%); }
 
 .brand h1 {
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: 700;
   font-size: 28px;
   margin: 0 0 4px;
   letter-spacing: -0.01em;
@@ -172,9 +174,9 @@ header.topbar {
   z-index: 5;
 }
 header.topbar h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
 }
 .badge-alert {
@@ -198,11 +200,45 @@ main.view {
 /* ---------- Product list ---------- */
 .search-row input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 12px 16px;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 3px;
-  margin-bottom: 14px;
+  border-radius: 28px;
+  margin-bottom: 12px;
+  box-shadow: none;
+}
+
+/* Category pills under the search input */
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #0b0b0b;
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: .88;
+}
+.pill.active {
+  background: transparent;
+  color: var(--teal);
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(0,160,122,0.06) inset;
+}
+.pill .count {
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .product-row {
@@ -236,6 +272,12 @@ main.view {
   font-size: 14px;
   font-weight: 600;
 }
+.product-qty-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .product-qty.low { color: var(--red); }
 .low-flag {
   display: inline-flex;
@@ -244,7 +286,7 @@ main.view {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--red);
-  margin-left: 8px;
+  margin-left: 0;
 }
 .low-flag::before {
   content: "";
@@ -281,9 +323,9 @@ main.view {
 
 /* ---------- Forms (add / edit) ---------- */
 h2.section-title {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 4px 0 18px;
 }
 
@@ -457,7 +499,7 @@ h2.section-title {
   justify-content: space-between;
   margin-bottom: 16px;
 }
-.modal-header h2 { margin: 0; font-family: var(--font-display); font-size: 19px; }
+.modal-header h2 { margin: 0; font-family: var(--font-body); font-size: 19px; font-weight:700; }
 .modal-close {
   background: none; border: none; font-size: 22px; color: var(--ink-soft); cursor: pointer; line-height: 1;
 }
@@ -467,8 +509,8 @@ nav.tabbar {
   position: sticky;
   bottom: 0;
   display: flex;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: #0b0b0b;
 }
 nav.tabbar button {
   flex: 1;
@@ -479,11 +521,11 @@ nav.tabbar button {
   padding: 10px 4px 12px;
   border: none;
   background: none;
-  color: var(--ink-soft);
+  color: rgba(255,255,255,0.85);
   cursor: pointer;
   font-size: 11.5px;
 }
-nav.tabbar button.active { color: var(--ink); }
+nav.tabbar button.active { color: var(--teal); }
 nav.tabbar svg { width: 21px; height: 21px; }
 
 /* ---------- Toast ---------- */
@@ -504,4 +546,181 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
 @media (min-width: 481px) {
   #shell { box-shadow: 0 0 0 1px var(--line); margin: 0 auto; }
+}
+
+/* Desktop: convert bottom nav into a left sidebar */
+@media (min-width: 900px) {
+  nav.tabbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: 8px;
+    border-top: none;
+    border-right: 1px solid rgba(0,0,0,0.06);
+    background: #0b0b0b;
+    z-index: 60;
+  }
+  /* Sidebar: tidy list layout */
+  nav.tabbar .sidebar-brand { padding: 18px 16px 10px; }
+  nav.tabbar button {
+    display: inline-flex;
+    flex: none;
+    width: auto;
+    align-self: flex-start;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-start;
+    margin: 4px 12px 0;
+    padding: 10px 14px;
+    color: rgba(255,255,255,0.92);
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  nav.tabbar button svg { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; }
+  nav.tabbar button:hover { background: rgba(255,255,255,0.02); }
+
+  /* push main shell to the right to make room for sidebar */
+  #shell {
+    margin-left: 360px;
+    max-width: calc(100% - 360px);
+  }
+
+  main.view { padding: 20px 28px 40px; }
+}
+
+@media (min-width: 900px) {
+  /* Hide scan tab on desktop */
+  nav.tabbar button[data-view="scan"] { display: none; }
+
+
+  /* Keep mobile card layout on desktop; grouping handled with columns-wrap */
+  #product-list { display: block; }
+
+  .product-row {
+    display: flex;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--ink);
+    background: var(--surface);
+    margin: 0 0 10px 0;
+    border-radius: 2px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .product-main { padding: 14px; }
+
+  /* Keep qty-stepper vertical like mobile and make it take full card height */
+  .product-row { align-items: stretch; }
+  .product-main { flex: 1 1 auto; }
+  .qty-stepper {
+    display: flex;
+    flex-direction: column;
+    width: 44px;
+    border-left: 1px solid var(--line);
+  }
+  .qty-stepper button {
+    flex: 1 1 0;
+    width: 100%;
+    border: none;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .qty-stepper button:first-child { border-bottom: 1px solid var(--line); }
+}
+
+/* Columns layout */
+.columns-wrap { display: flex; gap: 18px; }
+  /* Keep mobile card look: column lists are vertical, cards fill column width */
+  .category-column { flex: 0 0 var(--card-width); min-width: var(--card-width); }
+  .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
+  .column-list { display: block; max-height: calc(100vh - 220px); }
+
+  /* Desktop: when height exceeds, flow items into multiple columns inside each category */
+  @media (min-width: 900px) {
+    .column-list {
+      column-width: var(--card-width);
+      column-gap: 12px;
+      height: calc(100vh - 240px);
+      overflow: auto;
+    }
+    .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
+  }
+
+/* Modal centered on desktop */
+@media (min-width: 900px) {
+  .modal-backdrop { align-items: center; padding: 30px; }
+  .modal-sheet {
+    width: 820px;
+    max-width: calc(100% - 80px);
+    border-radius: 8px;
+    max-height: 90vh;
+  }
+}
+
+/* Ensure card width is consistent */
+@media (min-width: 900px) {
+  .product-row { width: 100%; max-width: none; }
+  .columns-wrap { flex-wrap: nowrap; }
+}
+
+/* Desktop: inventory view full-width, other views constrained */
+@media (min-width: 900px) {
+  #view-list { max-width: none; width: 100%; padding-left: 28px; padding-right: 28px; }
+  #view-add, #view-profile { max-width: 900px; margin-left: auto; margin-right: auto; }
+}
+
+/* Desktop sidebar visual styling to match reference image (only desktop) */
+@media (min-width: 900px) {
+  :root { --sidebar-width: 300px; }
+  nav.tabbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    padding: 0;
+    border-radius: 0;
+    background: #060606;
+    border: 1px solid rgba(255,255,255,0.03);
+    box-shadow: none;
+    overflow: auto;
+  }
+  nav.tabbar .sidebar-brand { padding: 10px 12px 8px; margin-bottom: 6px; }
+  nav.tabbar button { display: flex; align-items: center; gap: 10px; width: calc(100% - 24px); margin: 6px 12px; padding: 8px 12px; border-radius: 8px; background: transparent; color: #ddd; text-align: left; font-size: 14px; }
+  nav.tabbar button:first-child { background: rgba(255,255,255,0.02); font-weight:700; color: #fff; }
+  nav.tabbar button.active {
+    background: linear-gradient(90deg, rgba(0,160,122,0.06), rgba(0,160,122,0.03));
+    border-left: 4px solid var(--teal);
+    color: var(--teal);
+    padding-left: 12px;
+  }
+  nav.tabbar button svg { margin-right: 10px; flex: 0 0 18px; }
+  nav.tabbar button:not(:first-child):not(.active)::after { content: '\276F'; float: right; color: rgba(255,255,255,0.34); }
+  nav.tabbar { padding-bottom: 80px; }
+  /* ensure shell leaves room for fixed sidebar */
+  #shell { margin-left: calc(var(--sidebar-width) + 36px); max-width: calc(100% - (var(--sidebar-width) + 36px)); }
+}
+
+/* Limit main view width so add/profile content sits within it */
+@media (min-width: 900px) {
+  main.view { max-width: 900px; margin-left: auto; margin-right: auto; }
+}
+
+/* Desktop form/profile constraints */
+@media (min-width: 900px) {
+  #view-add form, #form-add-product { max-width: 900px; margin-left: auto; margin-right: auto; }
+  #view-profile .profile-card { max-width: 900px; margin-left: auto; margin-right: auto; }
+  #view-profile .btn { width: auto; display: inline-block; }
+  .danger-zone { max-width: 900px; margin-left: auto; margin-right: auto; }
 }

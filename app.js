@@ -315,26 +315,68 @@ function renderProductList() {
     return;
   }
 
-  // Always render mobile-style single-column cards to keep identical appearance across devices
-  container.innerHTML = finalFiltered
-    .map((p) => {
-      const low = isLowStock(p);
-      const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(' / ');
-      return `
-        <div class="product-row ${low ? 'low' : ''}" data-id="${p.id}">
-          <div class="product-main" data-id="${p.id}">
-            <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
-            <p class="product-meta">${escapeHtml(meta)}</p>
-            <span class="product-qty ${low ? 'low' : ''}">${p.quantity}</span>
-            ${low ? '<span class="low-flag">Queda poco</span>' : ''}
-          </div>
-          <div class="qty-stepper">
-            <button type="button" data-id="${p.id}" data-delta="1">+</button>
-            <button type="button" data-id="${p.id}" data-delta="-1">−</button>
-          </div>
-        </div>`;
-    })
-    .join('');
+  const isDesktop = window.innerWidth >= 900;
+
+  if (isDesktop) {
+    // Group products by category and render columns
+    const groups = finalFiltered.reduce((acc, p) => {
+      const key = p.category || 'Sin categoría';
+      acc[key] = acc[key] || [];
+      acc[key].push(p);
+      return acc;
+    }, {});
+
+    const cols = Object.keys(groups).sort().map((cat) => {
+      const items = groups[cat]
+        .map((p) => {
+          const low = isLowStock(p);
+          const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(' / ');
+          return `
+            <div class="product-row ${low ? 'low' : ''}" data-id="${p.id}">
+              <div class="product-main">
+                <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
+                <p class="product-meta">${escapeHtml(meta)}</p>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+                  <div class="product-qty-wrap">
+                    <div class="product-qty ${low ? 'low' : ''}" style="font-size:16px">${p.quantity}</div>
+                    ${low ? '<div class="low-flag">Queda poco</div>' : ''}
+                  </div>
+                  <div class="qty-stepper">
+                    <button type="button" data-id="${p.id}" data-delta="1">+</button>
+                    <button type="button" data-id="${p.id}" data-delta="-1">−</button>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        })
+        .join('');
+
+      return `<div class="category-column"><h4 class="col-title">${escapeHtml(cat)}</h4><div class="column-list">${items}</div></div>`;
+    }).join('');
+
+    container.innerHTML = `<div class="columns-wrap">${cols}</div>`;
+  } else {
+    // mobile: single-column list (existing behaviour)
+    container.innerHTML = finalFiltered
+      .map((p) => {
+        const low = isLowStock(p);
+        const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(' / ');
+        return `
+          <div class="product-row ${low ? 'low' : ''}">
+            <div class="product-main" data-id="${p.id}">
+              <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
+              <p class="product-meta">${escapeHtml(meta)}</p>
+              <span class="product-qty ${low ? 'low' : ''}">${p.quantity}</span>
+              ${low ? '<span class="low-flag">Queda poco</span>' : ''}
+            </div>
+            <div class="qty-stepper">
+              <button type="button" data-id="${p.id}" data-delta="1">+</button>
+              <button type="button" data-id="${p.id}" data-delta="-1">−</button>
+            </div>
+          </div>`;
+      })
+      .join('');
+  }
 
   container.querySelectorAll(".product-main").forEach((el) => {
     el.addEventListener("click", () => {

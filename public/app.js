@@ -337,7 +337,7 @@ function renderProductList() {
                 <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
                 <p class="product-meta">${escapeHtml(meta)}</p>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
-                  <div>
+                  <div class="product-qty-wrap">
                     <div class="product-qty ${low ? 'low' : ''}" style="font-size:16px">${p.quantity}</div>
                     ${low ? '<div class="low-flag">Queda poco</div>' : ''}
                   </div>
