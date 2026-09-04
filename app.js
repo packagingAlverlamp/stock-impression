@@ -355,6 +355,8 @@ function renderProductList() {
     }).join('');
 
     container.innerHTML = `<div class="columns-wrap">${cols}</div>`;
+    // after rendering, adjust columns that overflow to show two columns side-by-side
+    setTimeout(adjustCategoryWidths, 50);
   } else {
     // mobile: single-column list (existing behaviour)
     container.innerHTML = finalFiltered
@@ -392,6 +394,25 @@ function renderProductList() {
     });
   });
 }
+
+function adjustCategoryWidths() {
+  document.querySelectorAll('.category-column').forEach((col) => {
+    const list = col.querySelector('.column-list');
+    if (!list) return;
+    // If content requires vertical scroll, it means items overflow and will form multiple columns
+    const overflows = list.scrollHeight > list.clientHeight + 2;
+    if (overflows) {
+      col.classList.add('multi-column');
+    } else {
+      col.classList.remove('multi-column');
+    }
+  });
+}
+
+window.addEventListener('resize', () => {
+  // re-evaluate after resize
+  setTimeout(adjustCategoryWidths, 120);
+});
 
 // ---------------------------------------------------------------
 // Stock: actualización de cantidades + avisos de stock bajo

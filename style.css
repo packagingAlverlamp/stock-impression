@@ -645,6 +645,8 @@ nav.tabbar svg { width: 21px; height: 21px; }
     }
     .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
   }
+  /* When a category needs two columns, expand the category column width to show both side-by-side */
+  .category-column.multi-column { flex: 0 0 calc(var(--card-width) * 2 + 12px); min-width: calc(var(--card-width) * 2 + 12px); }
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {
