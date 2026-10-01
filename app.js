@@ -396,7 +396,21 @@ function renderCategoryPills() {
   });
 }
 
-$("search-input").addEventListener("input", () => renderProductList());
+const searchInput = $("search-input");
+const clearSearchBtn = $("clear-search");
+
+searchInput.addEventListener("input", () => {
+  const hasValue = searchInput.value.trim().length > 0;
+  clearSearchBtn.classList.toggle("hidden", !hasValue);
+  renderProductList();
+});
+
+clearSearchBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  clearSearchBtn.classList.add("hidden");
+  renderProductList();
+  searchInput.focus();
+});
 
 function renderProductList() {
   const term = $("search-input").value.trim().toLowerCase();
@@ -499,7 +513,8 @@ function renderProductList() {
     });
   });
   container.querySelectorAll(".qty-stepper button").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
       const product = allProducts.find((p) => p.id === btn.dataset.id);
       if (!product) return;
       await applyQuantityDelta(product, Number(btn.dataset.delta));
@@ -515,6 +530,24 @@ function adjustCategoryWidths() {
   if (!columns.length) return;
 
   const gap = 12;
+
+  if (activeCategoryFilter) {
+    const targetWidth = wrap.clientWidth * 0.25;
+    columns.forEach((col) => {
+      const list = col.querySelector('.column-list');
+      if (!list) return;
+
+      col.style.width = `${targetWidth}px`;
+      col.style.minWidth = `${targetWidth}px`;
+      col.style.flex = '0 0 auto';
+      list.style.columnCount = '4';
+      list.style.columnWidth = `${targetWidth}px`;
+      list.style.columnGap = '12px';
+      list.style.width = '100%';
+    });
+    return;
+  }
+
   const totalVisibleColumns = columns.reduce((sum, col) => {
     const list = col.querySelector('.column-list');
     const productCount = list ? list.querySelectorAll('.product-row').length : 0;
@@ -536,6 +569,7 @@ function adjustCategoryWidths() {
     col.style.minWidth = `${Math.max(categoryWidth, 240)}px`;
     col.style.flex = '0 0 auto';
     list.style.columnCount = String(cardColumns);
+    list.style.columnWidth = `${Math.max(categoryWidth / cardColumns, 240)}px`;
     list.style.columnGap = '12px';
     list.style.width = '100%';
 

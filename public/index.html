@@ -79,8 +79,11 @@
     <!-- ---------- Vista: Inventario ---------- -->
     <main id="view-list" class="view">
       <div class="search-row">
-            <input type="text" id="search-input" placeholder="Buscar por nombre, categoría, ubicación..." />
-          <div id="category-pills" class="category-pills" aria-hidden="false"></div>
+        <div class="search-input-wrap">
+          <input type="text" id="search-input" placeholder="Buscar por nombre, categoría, ubicación..." />
+          <button type="button" id="clear-search" class="clear-search hidden" aria-label="Borrar búsqueda">×</button>
+        </div>
+        <div id="category-pills" class="category-pills" aria-hidden="false"></div>
       </div>
       <div id="product-list"></div>
       <div id="list-empty" class="empty-state hidden">
