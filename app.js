@@ -541,44 +541,35 @@ function adjustCategoryWidths() {
       col.style.minWidth = `${targetWidth}px`;
       col.style.flex = '0 0 auto';
       list.style.columnCount = '4';
-      list.style.columnWidth = `${targetWidth}px`;
       list.style.columnGap = '12px';
       list.style.width = '100%';
     });
     return;
   }
 
-  const totalVisibleColumns = columns.reduce((sum, col) => {
+  const visibleShare = columns.reduce((sum, col) => {
     const list = col.querySelector('.column-list');
     const productCount = list ? list.querySelectorAll('.product-row').length : 0;
-    const cardColumns = Math.max(1, Math.min(4, productCount > 0 ? Math.ceil(productCount / 6) : 1));
-    col.dataset.cardColumns = String(cardColumns);
-    return sum + cardColumns;
+    const share = Math.max(1, Math.min(4, productCount > 0 ? Math.ceil(productCount / 6) : 1));
+    col.dataset.cardColumns = String(share);
+    return sum + share;
   }, 0);
 
-  const availableWidth = wrap.clientWidth - (gap * Math.max(0, columns.length - 1));
+  const available = Math.max(0, wrap.clientWidth - (gap * Math.max(0, columns.length - 1)));
 
   columns.forEach((col) => {
     const list = col.querySelector('.column-list');
     if (!list) return;
 
-    const cardColumns = Number(col.dataset.cardColumns || 1);
-    const categoryWidth = (cardColumns / totalVisibleColumns) * availableWidth;
-
-    col.style.width = `${Math.max(categoryWidth, 240)}px`;
-    col.style.minWidth = `${Math.max(categoryWidth, 240)}px`;
+    const share = Number(col.dataset.cardColumns || 1);
+    const width = (share / visibleShare) * available;
+    col.style.width = `${Math.max(width, 240)}px`;
+    col.style.minWidth = `${Math.max(width, 240)}px`;
     col.style.flex = '0 0 auto';
-    list.style.columnCount = String(cardColumns);
-    list.style.columnWidth = `${Math.max(categoryWidth / cardColumns, 240)}px`;
+    list.style.columnCount = String(share);
     list.style.columnGap = '12px';
     list.style.width = '100%';
-
-    const overflows = list.scrollHeight > list.clientHeight + 2;
-    if (overflows && cardColumns < 4) {
-      col.classList.add('multi-column');
-    } else {
-      col.classList.remove('multi-column');
-    }
+    list.style.overflow = 'hidden';
   });
 }
 
