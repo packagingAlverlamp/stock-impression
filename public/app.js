@@ -8,6 +8,8 @@ let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
 let activeCategoryFilter = '';
+const LOW_STOCK_CATEGORY_KEY = '__low_stock__';
+const CATEGORY_ORDER_COOKIE = 'stock_impresion_category_order';
 let addScanner = null;
 let stockScanner = null;
 let stockScanMode = "out"; // "out" = sacar stock, "in" = añadir stock
@@ -55,6 +57,35 @@ function enhanceSidebar() {
 window.addEventListener('resize', () => enhanceSidebar());
 // run once on load
 setTimeout(enhanceSidebar, 120);
+
+function getCategoryOrderCookie() {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + CATEGORY_ORDER_COOKIE + '=([^;]*)'));
+  if (!match) return [];
+  try {
+    return JSON.parse(decodeURIComponent(match[1] || '[]'));
+  } catch (err) {
+    return [];
+  }
+}
+
+function setCategoryOrderCookie(order) {
+  const value = encodeURIComponent(JSON.stringify(order));
+  document.cookie = `${CATEGORY_ORDER_COOKIE}=${value}; path=/; max-age=31536000`;
+}
+
+function getOrderedCategories() {
+  const cats = [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort();
+  const saved = getCategoryOrderCookie();
+  const validSaved = Array.isArray(saved) ? saved.filter((c) => cats.includes(c)) : [];
+  const rest = cats.filter((c) => !validSaved.includes(c));
+  return [...validSaved, ...rest];
+}
+
+function getCategoryFilterLabel(value) {
+  if (value === '') return 'Todos';
+  if (value === LOW_STOCK_CATEGORY_KEY) return 'Poco stock';
+  return value;
+}
 
 function escapeHtml(str) {
   if (str === null || str === undefined) return "";
@@ -377,16 +408,20 @@ function populateDatalists() {
 function renderCategoryPills() {
   const container = $("category-pills");
   if (!container) return;
-  const cats = [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort();
-  const items = ["Todos", ...cats];
 
+  const orderedCats = getOrderedCategories();
+  const items = ["Todos", "Poco stock", ...orderedCats];
   const isMobile = window.innerWidth < 900;
 
   if (isMobile) {
     container.innerHTML = `
       <label class="mobile-category-select-wrap">
         <select id="mobile-category-select" class="mobile-category-select">
-          ${items.map((c) => `<option value="${escapeHtml(c)}" ${((c === 'Todos' && activeCategoryFilter === '') || activeCategoryFilter === c) ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+          ${items.map((c) => {
+            const value = c === 'Todos' ? '' : c === 'Poco stock' ? LOW_STOCK_CATEGORY_KEY : c;
+            const selected = (c === 'Todos' && activeCategoryFilter === '') || activeCategoryFilter === value;
+            return `<option value="${escapeHtml(value)}" ${selected ? 'selected' : ''}>${escapeHtml(c)}</option>`;
+          }).join('')}
         </select>
       </label>
     `;
@@ -394,7 +429,7 @@ function renderCategoryPills() {
     const select = $("mobile-category-select");
     if (select) {
       select.addEventListener('change', () => {
-        const value = select.value === 'Todos' ? '' : select.value;
+        const value = select.value;
         activeCategoryFilter = value;
         renderCategoryPills();
         renderProductList();
@@ -405,18 +440,59 @@ function renderCategoryPills() {
 
   container.innerHTML = items
     .map((c) => {
-      const active = (c === "Todos" ? activeCategoryFilter === '' : activeCategoryFilter === c);
-      return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}${c!="Todos"?` <span class=\"count\">${allProducts.filter(p=>p.category===c).length}</span>`:''}</button>`;
+      const value = c === 'Todos' ? '' : c === 'Poco stock' ? LOW_STOCK_CATEGORY_KEY : c;
+      const active = (c === 'Todos' ? activeCategoryFilter === '' : activeCategoryFilter === value);
+      const count = c === 'Poco stock' ? allProducts.filter(isLowStock).length : c === 'Todos' ? allProducts.length : allProducts.filter((p) => p.category === c).length;
+      const draggable = c !== 'Todos' && c !== 'Poco stock' ? 'true' : 'false';
+      return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(value)}" draggable="${draggable}" title="${escapeHtml(c)}">${escapeHtml(c)}${c !== 'Todos' && c !== 'Poco stock' ? ` <span class=\"count\">${count}</span>` : ''}${c === 'Poco stock' ? ` <span class=\"count\">${count}</span>` : ''}</button>`;
     })
     .join("");
 
   container.querySelectorAll('.pill').forEach((btn) => {
+    const catValue = btn.dataset.cat;
+    const isMovable = catValue !== '' && catValue !== LOW_STOCK_CATEGORY_KEY;
+
     btn.addEventListener('click', () => {
-      const cat = btn.dataset.cat === 'Todos' ? '' : btn.dataset.cat;
-      activeCategoryFilter = cat;
+      if (!isMovable) {
+        activeCategoryFilter = catValue;
+        renderCategoryPills();
+        renderProductList();
+        return;
+      }
+      activeCategoryFilter = catValue;
       renderCategoryPills();
       renderProductList();
     });
+
+    if (isMovable) {
+      btn.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', catValue);
+        btn.classList.add('dragging');
+      });
+      btn.addEventListener('dragend', () => {
+        btn.classList.remove('dragging');
+      });
+      btn.addEventListener('dragover', (event) => {
+        event.preventDefault();
+      });
+      btn.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const sourceCategory = event.dataTransfer.getData('text/plain');
+        const targetCategory = catValue;
+        if (!sourceCategory || sourceCategory === targetCategory) return;
+
+        const current = getOrderedCategories();
+        const next = [...current];
+        const fromIndex = next.indexOf(sourceCategory);
+        const targetIndex = next.indexOf(targetCategory);
+        if (fromIndex === -1 || targetIndex === -1) return;
+        next.splice(fromIndex, 1);
+        next.splice(targetIndex, 0, sourceCategory);
+        setCategoryOrderCookie(next);
+        renderCategoryPills();
+        renderProductList();
+      });
+    }
   });
 }
 
@@ -446,9 +522,12 @@ function renderProductList() {
   });
 
   // apply active category filter
-  const finalFiltered = activeCategoryFilter
-    ? filtered.filter((p) => p.category === activeCategoryFilter)
-    : filtered;
+  let finalFiltered = filtered;
+  if (activeCategoryFilter === LOW_STOCK_CATEGORY_KEY) {
+    finalFiltered = filtered.filter((p) => isLowStock(p));
+  } else if (activeCategoryFilter) {
+    finalFiltered = filtered.filter((p) => p.category === activeCategoryFilter);
+  }
 
   const container = $("product-list");
   $("list-empty").classList.toggle("hidden", allProducts.length > 0);
@@ -469,7 +548,8 @@ function renderProductList() {
       return acc;
     }, {});
 
-    const cols = Object.keys(groups).sort().map((cat) => {
+    const orderedCategories = [...getOrderedCategories(), ...Object.keys(groups).filter((cat) => !getOrderedCategories().includes(cat))];
+    const cols = orderedCategories.filter((cat) => groups[cat]).map((cat) => {
       const items = groups[cat]
         .map((p) => {
           const low = isLowStock(p);
@@ -611,6 +691,41 @@ async function applyQuantityDelta(product, delta) {
   return updateProductQuantity(product.id, newQty);
 }
 
+function syncProductQuantityInDom(product) {
+  const row = document.querySelector(`.product-row[data-id="${product.id}"]`);
+  if (!row) return;
+
+  const qtyNodes = row.querySelectorAll('.product-qty');
+  qtyNodes.forEach((node) => {
+    node.textContent = String(product.quantity);
+    node.classList.toggle('low', isLowStock(product));
+  });
+
+  const lowFlag = row.querySelector('.low-flag');
+  if (lowFlag) {
+    lowFlag.classList.toggle('hidden', !isLowStock(product));
+    lowFlag.textContent = 'Queda poco';
+  }
+
+  row.classList.toggle('low', isLowStock(product));
+  const meta = [product.unit, product.location, product.supplier].filter(Boolean).join(' / ');
+  const metaNode = row.querySelector('.product-meta');
+  if (metaNode) metaNode.textContent = meta;
+
+  const main = row.querySelector('.product-main');
+  if (main) {
+    const qtyWrap = main.querySelector('.product-qty-wrap');
+    if (qtyWrap) {
+      const qty = qtyWrap.querySelector('.product-qty');
+      if (qty) qty.textContent = String(product.quantity);
+      const lowNode = qtyWrap.querySelector('.low-flag');
+      if (lowNode) {
+        lowNode.classList.toggle('hidden', !isLowStock(product));
+      }
+    }
+  }
+}
+
 async function updateProductQuantity(productId, newQty) {
   const { data, error } = await supabaseClient
     .from("products")
@@ -622,8 +737,16 @@ async function updateProductQuantity(productId, newQty) {
     showToast("Error al actualizar la cantidad");
     return null;
   }
+
+  const idx = allProducts.findIndex((p) => p.id === productId);
+  if (idx >= 0) {
+    allProducts[idx] = { ...allProducts[idx], ...data };
+  }
+
   await checkLowStock(data);
-  await loadProducts();
+  syncProductQuantityInDom(allProducts[idx] || data);
+  updateLowStockBadge();
+  populateDatalists();
   return data;
 }
 
