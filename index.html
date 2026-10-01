@@ -41,6 +41,10 @@
         <label for="reset-password">Nueva contraseña</label>
         <input type="password" id="reset-password" required minlength="6" autocomplete="new-password" />
       </div>
+      <div class="field">
+        <label for="reset-password-confirm">Confirmar nueva contraseña</label>
+        <input type="password" id="reset-password-confirm" required minlength="6" autocomplete="new-password" />
+      </div>
       <button type="submit" class="btn btn-primary">Guardar contraseña</button>
       <button type="button" id="cancel-reset-password" class="btn btn-outline" style="margin-top:10px">Volver</button>
     </form>
@@ -178,9 +182,13 @@
       </div>
 
       <div class="profile-card" style="margin-top:16px;">
-        <div class="field" style="margin-bottom:0;">
+        <div class="field">
           <label for="profile-new-password">Nueva contraseña</label>
           <input type="password" id="profile-new-password" placeholder="Escribe una contraseña nueva" autocomplete="new-password" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="profile-new-password-confirm">Confirmar nueva contraseña</label>
+          <input type="password" id="profile-new-password-confirm" placeholder="Repite la contraseña" autocomplete="new-password" />
         </div>
         <button type="button" class="btn btn-primary" id="change-password-btn" style="margin-top:12px">Cambiar contraseña</button>
       </div>

@@ -138,8 +138,15 @@ $("cancel-reset-password").addEventListener("click", () => {
 $("form-reset-password").addEventListener("submit", async (e) => {
   e.preventDefault();
   const newPassword = $("reset-password").value.trim();
+  const passwordConfirm = $("reset-password-confirm").value.trim();
+
   if (!newPassword || newPassword.length < 6) {
     showAuthError("La nueva contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  if (newPassword !== passwordConfirm) {
+    showAuthError("Las contraseñas no coinciden. Escríbelas igual en los dos campos.");
     return;
   }
 
@@ -153,6 +160,7 @@ $("form-reset-password").addEventListener("submit", async (e) => {
   showLoginForms();
   $("login-password").value = "";
   $("reset-password").value = "";
+  $("reset-password-confirm").value = "";
 });
 
 $("form-login").addEventListener("submit", async (e) => {
@@ -273,8 +281,15 @@ $("notify-toggle").addEventListener("change", async (e) => {
 
 $("change-password-btn").addEventListener("click", async () => {
   const newPassword = $("profile-new-password").value.trim();
+  const passwordConfirm = $("profile-new-password-confirm").value.trim();
+
   if (!newPassword || newPassword.length < 6) {
     showToast("La contraseña debe tener al menos 6 caracteres");
+    return;
+  }
+
+  if (newPassword !== passwordConfirm) {
+    showToast("Las contraseñas no coinciden. Escríbelas igual en los dos campos.");
     return;
   }
 
@@ -285,6 +300,7 @@ $("change-password-btn").addEventListener("click", async () => {
   }
 
   $("profile-new-password").value = "";
+  $("profile-new-password-confirm").value = "";
   showToast("Contraseña actualizada");
 });
 
