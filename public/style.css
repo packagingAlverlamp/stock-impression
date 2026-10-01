@@ -71,7 +71,7 @@ a { color: var(--teal); }
   width: 42px;
   height: 42px;
   display: inline-block;
-  background: url('favicon.svg') center / contain no-repeat;
+  background: url('img/fav.svg') center / contain no-repeat;
   position: relative;
   margin-bottom: 14px;
   border: none;
