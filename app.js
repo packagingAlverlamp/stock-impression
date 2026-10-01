@@ -399,7 +399,10 @@ function adjustCategoryWidths() {
   document.querySelectorAll('.category-column').forEach((col) => {
     const list = col.querySelector('.column-list');
     if (!list) return;
-    const overflows = list.scrollHeight > list.clientHeight + 2;
+
+    const productCount = list.querySelectorAll('.product-row').length;
+    const overflows = productCount > 6 || list.scrollHeight > list.clientHeight + 2;
+
     if (overflows) {
       col.classList.add('multi-column');
     } else {
