@@ -379,6 +379,30 @@ function renderCategoryPills() {
   if (!container) return;
   const cats = [...new Set(allProducts.map((p) => p.category).filter(Boolean))].sort();
   const items = ["Todos", ...cats];
+
+  const isMobile = window.innerWidth < 900;
+
+  if (isMobile) {
+    container.innerHTML = `
+      <label class="mobile-category-select-wrap">
+        <select id="mobile-category-select" class="mobile-category-select">
+          ${items.map((c) => `<option value="${escapeHtml(c)}" ${((c === 'Todos' && activeCategoryFilter === '') || activeCategoryFilter === c) ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
+      </label>
+    `;
+
+    const select = $("mobile-category-select");
+    if (select) {
+      select.addEventListener('change', () => {
+        const value = select.value === 'Todos' ? '' : select.value;
+        activeCategoryFilter = value;
+        renderCategoryPills();
+        renderProductList();
+      });
+    }
+    return;
+  }
+
   container.innerHTML = items
     .map((c) => {
       const active = (c === "Todos" ? activeCategoryFilter === '' : activeCategoryFilter === c);
@@ -532,15 +556,16 @@ function adjustCategoryWidths() {
   const gap = 12;
 
   if (activeCategoryFilter) {
-    const targetWidth = wrap.clientWidth * 0.25;
+    const cardWidth = wrap.clientWidth * 0.25;
     columns.forEach((col) => {
       const list = col.querySelector('.column-list');
       if (!list) return;
 
-      col.style.width = `${targetWidth}px`;
-      col.style.minWidth = `${targetWidth}px`;
-      col.style.flex = '0 0 auto';
+      col.style.width = '100%';
+      col.style.minWidth = '100%';
+      col.style.flex = '1 0 auto';
       list.style.columnCount = '4';
+      list.style.columnWidth = `${cardWidth}px`;
       list.style.columnGap = '12px';
       list.style.width = '100%';
     });
