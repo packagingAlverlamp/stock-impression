@@ -905,15 +905,30 @@ nav.tabbar svg { width: 21px; height: 21px; }
   #shell { margin-left: calc(var(--sidebar-width) + 36px); max-width: calc(100% - (var(--sidebar-width) + 36px)); }
 }
 
-/* Limit main view width so add/profile content sits within it */
+/* Remove desktop side gutters so content spans the available canvas */
 @media (min-width: 900px) {
-  main.view { max-width: 900px; margin-left: auto; margin-right: auto; }
+  main.view {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 /* Desktop form/profile constraints */
 @media (min-width: 900px) {
-  #view-add form, #form-add-product { max-width: 900px; margin-left: auto; margin-right: auto; }
-  #view-profile .profile-card { max-width: 900px; margin-left: auto; margin-right: auto; }
+  #view-add form, #form-add-product {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  #view-profile .profile-card {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
   #view-profile .btn { width: auto; display: inline-block; }
-  .danger-zone { max-width: 900px; margin-left: auto; margin-right: auto; }
+  .danger-zone { max-width: none; margin-left: 0; margin-right: 0; }
 }
