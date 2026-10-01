@@ -31,6 +31,18 @@
         <input type="password" id="login-password" required autocomplete="current-password" />
       </div>
       <button type="submit" class="btn btn-primary">Entrar</button>
+      <p class="auth-link-row">
+        <button type="button" id="forgot-password-link" class="text-link">¿Olvidaste tu contraseña?</button>
+      </p>
+    </form>
+
+    <form id="form-reset-password" class="hidden">
+      <div class="field">
+        <label for="reset-password">Nueva contraseña</label>
+        <input type="password" id="reset-password" required minlength="6" autocomplete="new-password" />
+      </div>
+      <button type="submit" class="btn btn-primary">Guardar contraseña</button>
+      <button type="button" id="cancel-reset-password" class="btn btn-outline" style="margin-top:10px">Volver</button>
     </form>
 
     <!-- Formulario de registro -->
@@ -163,6 +175,14 @@
             <span class="switch-track"></span>
           </label>
         </div>
+      </div>
+
+      <div class="profile-card" style="margin-top:16px;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="profile-new-password">Nueva contraseña</label>
+          <input type="password" id="profile-new-password" placeholder="Escribe una contraseña nueva" autocomplete="new-password" />
+        </div>
+        <button type="button" class="btn btn-primary" id="change-password-btn" style="margin-top:12px">Cambiar contraseña</button>
       </div>
 
       <button type="button" class="btn btn-outline" id="signout-btn" style="margin-bottom:20px">Cerrar sesión</button>

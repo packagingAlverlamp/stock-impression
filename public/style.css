@@ -145,6 +145,20 @@ a { color: var(--teal); }
   background: none; border: none; color: var(--teal); font-weight: 600; cursor: pointer; text-decoration: underline;
 }
 
+.auth-link-row {
+  margin-top: 12px;
+  text-align: center;
+}
+.text-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--teal);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .error-msg {
   background: var(--red-soft);
   color: var(--red);

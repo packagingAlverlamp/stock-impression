@@ -93,6 +93,68 @@ function showAuthError(msg) {
   el.classList.remove("hidden");
 }
 
+function showLoginForms() {
+  $("form-login").classList.remove("hidden");
+  $("form-register").classList.add("hidden");
+  $("form-reset-password").classList.add("hidden");
+  $("switch-to-register-wrap").classList.remove("hidden");
+  $("switch-to-login-wrap").classList.add("hidden");
+  $("auth-error").classList.add("hidden");
+}
+
+function showRecoveryForm() {
+  $("form-login").classList.add("hidden");
+  $("form-register").classList.add("hidden");
+  $("form-reset-password").classList.remove("hidden");
+  $("switch-to-register-wrap").classList.add("hidden");
+  $("switch-to-login-wrap").classList.add("hidden");
+  $("auth-error").classList.add("hidden");
+  const input = $("reset-password");
+  if (input) setTimeout(() => input.focus(), 50);
+}
+
+$("forgot-password-link").addEventListener("click", async () => {
+  const email = $("login-email").value.trim();
+  if (!email) {
+    showAuthError("Escribe tu email para recibir el enlace de recuperación.");
+    return;
+  }
+
+  const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
+
+  if (error) {
+    showAuthError("No se pudo enviar el email: " + error.message);
+  } else {
+    showToast("Si esa cuenta existe, te hemos enviado un email para restablecer la contraseña.");
+    showLoginForms();
+  }
+});
+
+$("cancel-reset-password").addEventListener("click", () => {
+  showLoginForms();
+});
+
+$("form-reset-password").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const newPassword = $("reset-password").value.trim();
+  if (!newPassword || newPassword.length < 6) {
+    showAuthError("La nueva contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if (error) {
+    showAuthError("No se pudo guardar la nueva contraseña: " + error.message);
+    return;
+  }
+
+  showToast("Contraseña actualizada correctamente.");
+  showLoginForms();
+  $("login-password").value = "";
+  $("reset-password").value = "";
+});
+
 $("form-login").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("auth-error").classList.add("hidden");
@@ -122,6 +184,14 @@ $("signout-btn").addEventListener("click", async () => {
 });
 
 supabaseClient.auth.onAuthStateChange((_event, session) => {
+  if (_event === "PASSWORD_RECOVERY") {
+    currentUser = session?.user || null;
+    $("app").classList.add("hidden");
+    $("view-auth").classList.remove("hidden");
+    showRecoveryForm();
+    return;
+  }
+
   if (session && session.user) {
     currentUser = session.user;
     enterApp();
@@ -129,6 +199,7 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
     currentUser = null;
     $("app").classList.add("hidden");
     $("view-auth").classList.remove("hidden");
+    showLoginForms();
   }
 });
 
@@ -198,6 +269,23 @@ $("notify-toggle").addEventListener("change", async (e) => {
     currentProfile.notify_low_stock = checked;
     showToast(checked ? "Avisos de stock bajo activados" : "Avisos de stock bajo desactivados");
   }
+});
+
+$("change-password-btn").addEventListener("click", async () => {
+  const newPassword = $("profile-new-password").value.trim();
+  if (!newPassword || newPassword.length < 6) {
+    showToast("La contraseña debe tener al menos 6 caracteres");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if (error) {
+    showToast("No se pudo cambiar la contraseña: " + error.message);
+    return;
+  }
+
+  $("profile-new-password").value = "";
+  showToast("Contraseña actualizada");
 });
 
 $("delete-account-btn").addEventListener("click", async () => {
