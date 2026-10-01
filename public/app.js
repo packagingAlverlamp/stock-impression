@@ -414,17 +414,37 @@ function renderCategoryPills() {
   const isMobile = window.innerWidth < 900;
 
   if (isMobile) {
+    const categoryOptions = orderedCats;
+    const quickButtons = [
+      { label: 'Todos', value: '', className: 'mobile-category-quick' },
+      { label: 'Poco stock', value: LOW_STOCK_CATEGORY_KEY, className: 'mobile-category-quick low-stock' },
+    ];
+
     container.innerHTML = `
+      <div class="mobile-category-quick-row">
+        ${quickButtons.map((button) => {
+          const isActive = activeCategoryFilter === button.value;
+          return `<button type="button" class="${button.className}${isActive ? ' active' : ''}" data-filter="${escapeHtml(button.value)}">${escapeHtml(button.label)}</button>`;
+        }).join('')}
+      </div>
       <label class="mobile-category-select-wrap">
         <select id="mobile-category-select" class="mobile-category-select">
-          ${items.map((c) => {
-            const value = c === 'Todos' ? '' : c === 'Poco stock' ? LOW_STOCK_CATEGORY_KEY : c;
-            const selected = (c === 'Todos' && activeCategoryFilter === '') || activeCategoryFilter === value;
-            return `<option value="${escapeHtml(value)}" ${selected ? 'selected' : ''}>${escapeHtml(c)}</option>`;
+          <option value="">Selecciona una categoría</option>
+          ${categoryOptions.map((cat) => {
+            const selected = activeCategoryFilter === cat;
+            return `<option value="${escapeHtml(cat)}" ${selected ? 'selected' : ''}>${escapeHtml(cat)}</option>`;
           }).join('')}
         </select>
       </label>
     `;
+
+    container.querySelectorAll('.mobile-category-quick').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeCategoryFilter = btn.dataset.filter || '';
+        renderCategoryPills();
+        renderProductList();
+      });
+    });
 
     const select = $("mobile-category-select");
     if (select) {
@@ -1060,8 +1080,19 @@ function setScanMode(mode) {
   $("scan-result").innerHTML = "";
 }
 
+function setScanCameraVisible(visible) {
+  const camera = $("qr-reader");
+  if (!camera) return;
+  if (visible) {
+    camera.classList.remove("hidden");
+  } else {
+    camera.classList.add("hidden");
+  }
+}
+
 function startStockScanner() {
   if (stockScanner) return;
+  setScanCameraVisible(true);
   $("scan-result").classList.add("hidden");
   $("scan-result").innerHTML = "";
   stockScanner = new Html5Qrcode("qr-reader");
@@ -1086,6 +1117,8 @@ async function onStockScan(ean) {
   if (scanCooldown) return;
   scanCooldown = true;
   setTimeout(() => (scanCooldown = false), 1200);
+
+  setScanCameraVisible(false);
 
   if (stockScanner) {
     try { await stockScanner.pause(true); } catch (e) {}
@@ -1147,6 +1180,7 @@ async function onStockScan(ean) {
 function resumeScan() {
   $("scan-result").classList.add("hidden");
   $("scan-result").innerHTML = "";
+  setScanCameraVisible(true);
   if (stockScanner) {
     stockScanner.resume();
   } else {

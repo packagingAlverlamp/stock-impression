@@ -269,17 +269,64 @@ main.view {
   cursor: pointer;
   opacity: .88;
 }
+.pill[data-cat=""] {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.pill[data-cat="__low_stock__"] {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
 .pill.active {
   background: transparent;
   color: var(--teal);
   border-color: var(--teal);
   box-shadow: 0 0 0 4px rgba(0,160,122,0.06) inset;
 }
+.pill[data-cat=""].active,
+.pill[data-cat="__low_stock__"].active {
+  background: inherit;
+  color: #fff;
+  border-color: inherit;
+  box-shadow: none;
+}
 .pill .count {
   background: rgba(255,255,255,0.06);
   padding: 2px 6px;
   border-radius: 999px;
   font-size: 12px;
+}
+.pill[data-cat=""] .count,
+.pill[data-cat="__low_stock__"] .count {
+  background: rgba(255,255,255,0.12);
+}
+.mobile-category-quick-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mobile-category-quick {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mobile-category-quick.active {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.mobile-category-quick.low-stock.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
 }
 .mobile-category-select-wrap {
   display: block;
