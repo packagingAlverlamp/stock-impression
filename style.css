@@ -558,30 +558,33 @@ nav.tabbar svg { width: 21px; height: 21px; }
     width: 220px;
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
+    justify-content: flex-start;
     padding-top: 8px;
     border-top: none;
     border-right: 1px solid rgba(0,0,0,0.06);
     background: #0b0b0b;
     z-index: 60;
   }
-  /* Sidebar: tidy list layout */
+  /* Sidebar: compact list layout, not full-height blocks */
   nav.tabbar .sidebar-brand { padding: 18px 16px 10px; }
   nav.tabbar button {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     justify-content: flex-start;
-    align-self: flex-start;
     width: auto;
+    min-height: 0;
     height: auto;
-    padding: 10px 12px;
+    padding: 8px 12px;
+    margin: 2px 0;
     color: rgba(255,255,255,0.92);
     border: none;
     background: transparent;
     text-align: left;
     font-weight: 600;
     line-height: 1.2;
+    white-space: nowrap;
   }
   nav.tabbar button svg { flex: 0 0 18px; width: 18px; height: 18px; margin: 0; }
   nav.tabbar button:hover { background: rgba(255,255,255,0.02); }
@@ -643,19 +646,24 @@ nav.tabbar svg { width: 21px; height: 21px; }
   /* Keep mobile card look: column lists are vertical, cards fill column width */
   .category-column { flex: 0 0 var(--card-width); min-width: var(--card-width); }
   .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-  .column-list { display: block; max-height: calc(100vh - 220px); }
+  .column-list {
+    display: block;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
 
-  /* Desktop: when height exceeds, flow items into multiple columns inside each category */
+  /* Desktop: flow items into multiple columns inside each category without hiding cards */
   @media (min-width: 900px) {
     .column-list {
       column-width: var(--card-width);
       column-gap: 12px;
-      height: calc(100vh - 240px);
-      overflow: auto;
+      width: auto;
+      overflow: visible;
     }
     .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
   }
-  /* When a category needs two columns, expand the category column width to show both side-by-side */
+  /* When a category needs two columns, expand the outer width so both internal columns remain visible */
   .category-column.multi-column { flex: 0 0 calc(var(--card-width) * 2 + 12px); min-width: calc(var(--card-width) * 2 + 12px); }
 
 /* Modal centered on desktop */
@@ -704,6 +712,7 @@ nav.tabbar svg { width: 21px; height: 21px; }
     gap: 8px;
     width: auto;
     height: auto;
+    min-height: 0;
     align-self: flex-start;
     margin: 6px 12px;
     padding: 8px 12px;
@@ -713,6 +722,7 @@ nav.tabbar svg { width: 21px; height: 21px; }
     text-align: left;
     font-size: 14px;
     line-height: 1.2;
+    white-space: nowrap;
   }
   nav.tabbar button:first-child { background: rgba(255,255,255,0.02); font-weight:700; color: #fff; }
   nav.tabbar button.active {

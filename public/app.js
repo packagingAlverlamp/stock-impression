@@ -399,8 +399,7 @@ function adjustCategoryWidths() {
   document.querySelectorAll('.category-column').forEach((col) => {
     const list = col.querySelector('.column-list');
     if (!list) return;
-    // If content requires vertical scroll, it means items overflow and will form multiple columns
-    const overflows = list.scrollHeight > list.clientHeight + 2;
+    const overflows = list.scrollWidth > list.clientWidth + 2;
     if (overflows) {
       col.classList.add('multi-column');
     } else {
