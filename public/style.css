@@ -603,7 +603,8 @@ nav.tabbar svg { width: 21px; height: 21px; }
 @media (min-width: 900px) {
   /* Hide scan tab on desktop */
   nav.tabbar button[data-view="scan"] { display: none; }
-
+  #add-scan-ean-btn,
+  #add-scanner { display: none !important; }
 
   /* Keep mobile card layout on desktop; grouping handled with columns-wrap */
   #product-list { display: block; }
