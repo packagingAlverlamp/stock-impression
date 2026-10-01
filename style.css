@@ -659,38 +659,56 @@ nav.tabbar svg { width: 21px; height: 21px; }
 }
 
 /* Columns layout */
-.columns-wrap { display: flex; gap: 18px; align-items: flex-start; }
+.columns-wrap {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  --column-gap: 18px;
+  --category-columns: 1;
+}
+
   /* Keep mobile card look: column lists are vertical, cards fill column width */
-  .category-column { flex: 0 0 var(--card-width); min-width: var(--card-width); }
+  .category-column {
+    flex: 1 1 0;
+    min-width: 0;
+    width: calc((100% - (var(--column-gap) * (var(--category-columns) - 1))) / var(--category-columns));
+  }
   .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
   .column-list {
     display: block;
     height: calc(100vh - 240px);
     overflow: hidden;
-    column-width: var(--card-width);
+    width: 100%;
     column-gap: 12px;
   }
 
   /* Desktop: flow items into multiple columns inside each category without hiding cards */
   @media (min-width: 900px) {
     .column-list {
-      column-width: var(--card-width);
       column-gap: 12px;
-      width: auto;
+      width: 100%;
       overflow: hidden;
     }
-    .column-list .product-row { display: inline-block; width: 100%; break-inside: avoid; margin-bottom: 12px; }
+    .column-list .product-row {
+      display: inline-block;
+      width: var(--card-width);
+      max-width: 100%;
+      break-inside: avoid;
+      margin-bottom: 12px;
+    }
   }
-  /* When a category needs two columns, expand the outer width so both internal columns remain visible */
+  /* When a category needs two columns, keep the card width fixed so all cards match across categories */
   .category-column.multi-column {
-    flex: 0 0 calc(var(--card-width) * 2 + 12px);
-    min-width: calc(var(--card-width) * 2 + 12px);
-    width: calc(var(--card-width) * 2 + 12px);
+    flex: 1 1 0;
+    min-width: 0;
+    width: calc((100% - (var(--column-gap) * (var(--category-columns) - 1))) / var(--category-columns));
   }
   .category-column.multi-column .column-list {
     column-count: 2;
-    column-width: auto;
-    width: calc(var(--card-width) * 2 + 12px);
+    column-width: var(--card-width);
+    width: 100%;
     overflow: visible;
   }
 

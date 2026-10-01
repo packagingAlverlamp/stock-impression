@@ -114,16 +114,22 @@ module.exports = async (req, res) => {
 
   const subject = 'Resumen semanal de stock bajo';
   const html = buildWeeklyDigestHtml(lowStockProducts);
-  const text = lowStockProducts
-    .map((p) => `${p.name}: ${p.quantity} ${p.unit || 'uds'} (mínimo ${p.min_quantity})`)
-    .join('\n');
+  const text = [
+    'Estos suministros están por debajo del mínimo:',
+    '',
+    ...lowStockProducts.map((p) => `- ${p.name}: stock ${p.quantity} / mínimo ${p.min_quantity}${p.unit ? ` (${p.unit})` : ''}`),
+    '',
+    'Reponlos cuando puedas.',
+    '',
+    '— Stock Impresión'
+  ].join('\n');
 
   const payload = {
     personalizations: [{ to: emails.map((email) => ({ email })) }],
     from: { email: sendGridFrom },
     subject,
     content: [
-      { type: 'text/plain', value: `Resumen semanal de stock bajo\n\n${text}` },
+      { type: 'text/plain', value: text },
       { type: 'text/html', value: html }
     ]
   };

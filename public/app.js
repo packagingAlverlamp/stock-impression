@@ -459,7 +459,14 @@ function renderProductList() {
       return `<div class="category-column"><h4 class="col-title">${escapeHtml(cat)}</h4><div class="column-list">${items}</div></div>`;
     }).join('');
 
-    container.innerHTML = `<div class="columns-wrap">${cols}</div>`;
+    const wrap = document.createElement('div');
+    wrap.className = 'columns-wrap';
+    wrap.innerHTML = cols;
+    const categoryCount = wrap.querySelectorAll('.category-column').length;
+    const cappedCount = Math.max(1, Math.min(categoryCount, 4));
+    wrap.style.setProperty('--category-columns', String(cappedCount));
+    container.innerHTML = '';
+    container.appendChild(wrap);
     // after rendering, adjust columns that overflow to show two columns side-by-side
     setTimeout(adjustCategoryWidths, 50);
   } else {
@@ -595,9 +602,16 @@ async function sendLowStockEmail(product) {
     if (emails.length === 0) return;
 
     const subject = `Stock bajo: ${product.name}`;
-    const message =
-      `El suministro "${product.name}" tiene ${product.quantity} ${product.unit || "unidades"} ` +
-      `(mínimo definido: ${product.min_quantity}).\n\nRepón stock cuando puedas.\n\n— Stock Impresión`;
+    const message = [
+      `El suministro \"${product.name}\" está por debajo del mínimo.`,
+      `- Stock actual: ${product.quantity}`,
+      `- Mínimo: ${product.min_quantity}`,
+      `- Unidad: ${product.unit || "unidades"}`,
+      "",
+      "Reponlo cuando puedas.",
+      "",
+      "— Stock Impresión",
+    ].join("\n");
     const html = buildLowStockEmailHtml(product);
 
     if (useEmailJS && window.emailjs && typeof window.emailjs.send === 'function') {
