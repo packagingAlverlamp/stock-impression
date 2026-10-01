@@ -203,6 +203,7 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
   if (session && session.user) {
     currentUser = session.user;
     enterApp();
+    maybeSendWeeklyLowStockDigest();
   } else {
     currentUser = null;
     $("app").classList.add("hidden");
@@ -554,6 +555,32 @@ async function checkLowStock(product) {
   }
 }
 
+function buildLowStockEmailHtml(product) {
+  const unit = product.unit || "uds";
+  const title = `Stock bajo: ${product.name}`;
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1e1e1e; max-width: 640px; margin: 0 auto; background: #f7f7f7; padding: 24px; border-radius: 12px;">
+      <div style="background: #111827; color: #ffffff; border-radius: 10px 10px 0 0; padding: 18px 20px;">
+        <div style="font-size: 22px; font-weight: 700;">Stock Impresión</div>
+        <div style="font-size: 12px; opacity: 0.8; margin-top: 6px;">Aviso de stock bajo</div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e5e7eb; border-top: none; padding: 22px 20px 18px; border-radius: 0 0 10px 10px;">
+        <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 10px;">Alerta</div>
+        <div style="font-size: 24px; font-weight: 700; margin-bottom: 12px;">${escapeHtml(product.name)}</div>
+        <div style="font-size: 16px; line-height: 1.6; color: #374151; margin-bottom: 18px;">
+          El suministro <strong>${escapeHtml(product.name)}</strong> tiene <strong>${product.quantity}</strong> ${escapeHtml(unit)} y ha llegado al mínimo definido de <strong>${product.min_quantity}</strong>.
+        </div>
+        <div style="background: #fff1f2; border-left: 4px solid #dc2626; padding: 12px 14px; border-radius: 8px; color: #7f1d1d; font-weight: 600;">
+          Reponlo cuanto antes para evitar quedarse sin stock.
+        </div>
+        <div style="margin-top: 18px; font-size: 12px; color: #6b7280;">
+          — Stock Impresión
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 async function sendLowStockEmail(product) {
   try {
     // Prefer EmailJS if configured (no server required)
@@ -571,9 +598,9 @@ async function sendLowStockEmail(product) {
     const message =
       `El suministro "${product.name}" tiene ${product.quantity} ${product.unit || "unidades"} ` +
       `(mínimo definido: ${product.min_quantity}).\n\nRepón stock cuando puedas.\n\n— Stock Impresión`;
+    const html = buildLowStockEmailHtml(product);
 
     if (useEmailJS && window.emailjs && typeof window.emailjs.send === 'function') {
-      // send individual emails via EmailJS (template should accept 'to_email', 'subject', 'message')
       const promises = emails.map((to) => {
         const templateParams = {
           to_email: to,
@@ -593,7 +620,6 @@ async function sendLowStockEmail(product) {
       return;
     }
 
-    // Fallback: use APPS_SCRIPT_URL (Google Apps Script or your PHP endpoint)
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) return;
 
     await fetch(APPS_SCRIPT_URL, {
@@ -602,11 +628,31 @@ async function sendLowStockEmail(product) {
       body: JSON.stringify({
         emails,
         subject,
-        message,
+        text: message,
+        html,
       }),
     });
   } catch (err) {
     console.error("No se pudo enviar el aviso por email:", err);
+  }
+}
+
+async function maybeSendWeeklyLowStockDigest() {
+  try {
+    const today = new Date();
+    const day = today.getDay(); // Sunday=0, Monday=1
+    if (day !== 1) return;
+
+    const key = 'stock-impresion-last-weekly-digest';
+    const iso = today.toISOString().slice(0, 10);
+    if (localStorage.getItem(key) === iso) return;
+
+    const res = await fetch('/api/weekly-low-stock', { method: 'POST' });
+    if (res.ok) {
+      localStorage.setItem(key, iso);
+    }
+  } catch (err) {
+    console.warn('No se pudo disparar el resumen semanal:', err);
   }
 }
 

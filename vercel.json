@@ -5,5 +5,11 @@
       "use": "@vercel/static-build",
       "config": { "distDir": "public" }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/weekly-low-stock",
+      "schedule": "0 9 * * 1"
+    }
   ]
 }

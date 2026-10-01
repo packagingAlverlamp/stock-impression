@@ -4,5 +4,8 @@
   "private": true,
   "scripts": {
     "build": "node scripts/generate-config.js && mkdir -p public && cp index.html app.js style.css public/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2"
   }
 }
