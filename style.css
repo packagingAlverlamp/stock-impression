@@ -661,56 +661,39 @@ nav.tabbar svg { width: 21px; height: 21px; }
 /* Columns layout */
 .columns-wrap {
   display: flex;
-  gap: 18px;
+  gap: 12px;
   align-items: flex-start;
   width: 100%;
   max-width: 100%;
-  --column-gap: 18px;
-  --category-columns: 1;
 }
 
-  /* Keep mobile card look: column lists are vertical, cards fill column width */
-  .category-column {
-    flex: 1 1 0;
-    min-width: 0;
-    width: calc((100% - (var(--column-gap) * (var(--category-columns) - 1))) / var(--category-columns));
-  }
-  .col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
-  .column-list {
-    display: block;
-    height: calc(100vh - 240px);
-    overflow: hidden;
-    width: 100%;
-    column-gap: 12px;
-  }
+.category-column {
+  flex: 0 0 auto;
+  min-width: 0;
+}
 
-  /* Desktop: flow items into multiple columns inside each category without hiding cards */
-  @media (min-width: 900px) {
-    .column-list {
-      column-gap: 12px;
-      width: 100%;
-      overflow: hidden;
-    }
-    .column-list .product-row {
-      display: inline-block;
-      width: var(--card-width);
-      max-width: 100%;
-      break-inside: avoid;
-      margin-bottom: 12px;
-    }
-  }
-  /* When a category needs two columns, keep the card width fixed so all cards match across categories */
-  .category-column.multi-column {
-    flex: 1 1 0;
-    min-width: 0;
-    width: calc((100% - (var(--column-gap) * (var(--category-columns) - 1))) / var(--category-columns));
-  }
-  .category-column.multi-column .column-list {
-    column-count: 2;
-    column-width: var(--card-width);
+.col-title { color: var(--ink); font-weight:700; margin: 0 0 8px; font-size: 15px; }
+.column-list {
+  display: block;
+  height: calc(100vh - 240px);
+  overflow: hidden;
+  width: 100%;
+  column-gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .column-list {
+    column-gap: 12px;
     width: 100%;
-    overflow: visible;
+    overflow: hidden;
   }
+  .column-list .product-row {
+    display: inline-block;
+    width: 100%;
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+}
 
 /* Modal centered on desktop */
 @media (min-width: 900px) {

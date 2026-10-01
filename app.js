@@ -508,14 +508,39 @@ function renderProductList() {
 }
 
 function adjustCategoryWidths() {
-  document.querySelectorAll('.category-column').forEach((col) => {
+  const wrap = document.querySelector('.columns-wrap');
+  if (!wrap) return;
+
+  const columns = [...wrap.querySelectorAll('.category-column')];
+  if (!columns.length) return;
+
+  const gap = 12;
+  const totalVisibleColumns = columns.reduce((sum, col) => {
+    const list = col.querySelector('.column-list');
+    const productCount = list ? list.querySelectorAll('.product-row').length : 0;
+    const cardColumns = Math.max(1, Math.min(4, productCount > 0 ? Math.ceil(productCount / 6) : 1));
+    col.dataset.cardColumns = String(cardColumns);
+    return sum + cardColumns;
+  }, 0);
+
+  const availableWidth = wrap.clientWidth - (gap * Math.max(0, columns.length - 1));
+
+  columns.forEach((col) => {
     const list = col.querySelector('.column-list');
     if (!list) return;
 
-    const productCount = list.querySelectorAll('.product-row').length;
-    const overflows = productCount > 6 || list.scrollHeight > list.clientHeight + 2;
+    const cardColumns = Number(col.dataset.cardColumns || 1);
+    const categoryWidth = (cardColumns / totalVisibleColumns) * availableWidth;
 
-    if (overflows) {
+    col.style.width = `${Math.max(categoryWidth, 240)}px`;
+    col.style.minWidth = `${Math.max(categoryWidth, 240)}px`;
+    col.style.flex = '0 0 auto';
+    list.style.columnCount = String(cardColumns);
+    list.style.columnGap = '12px';
+    list.style.width = '100%';
+
+    const overflows = list.scrollHeight > list.clientHeight + 2;
+    if (overflows && cardColumns < 4) {
       col.classList.add('multi-column');
     } else {
       col.classList.remove('multi-column');
