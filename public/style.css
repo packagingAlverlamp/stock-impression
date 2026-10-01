@@ -319,8 +319,8 @@ main.view {
   cursor: pointer;
 }
 .mobile-category-quick.active {
-  background: var(--teal);
-  border-color: var(--teal);
+  background: #1b1b1b;
+  border-color: #1b1b1b;
   color: #fff;
 }
 .mobile-category-quick.low-stock.active {
