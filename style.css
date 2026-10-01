@@ -68,19 +68,26 @@ a { color: var(--teal); }
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border: 2px solid var(--ink);
+  width: 42px;
+  height: 42px;
+  display: inline-block;
+  background: url('favicon.svg') center / contain no-repeat;
   position: relative;
   margin-bottom: 14px;
+  border: none;
+  box-shadow: none;
 }
-.brand-mark::before, .brand-mark::after {
-  content: "";
-  position: absolute;
-  background: var(--ink);
+.topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
 }
-.brand-mark::before { top: 50%; left: -6px; right: -6px; height: 1px; transform: translateY(-50%); }
-.brand-mark::after { left: 50%; top: -6px; bottom: -6px; width: 1px; transform: translateX(-50%); }
+.header-brand-mark {
+  width: 26px;
+  height: 26px;
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
 
 .brand h1 {
   font-family: var(--font-body);
