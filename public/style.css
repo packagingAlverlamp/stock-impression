@@ -905,13 +905,13 @@ nav.tabbar svg { width: 21px; height: 21px; }
   #shell { margin-left: calc(var(--sidebar-width) + 36px); max-width: calc(100% - (var(--sidebar-width) + 36px)); }
 }
 
-/* Remove desktop side gutters so content spans the available canvas */
+/* Keep desktop content visually centered in the parent shell without wide side gutters */
 @media (min-width: 900px) {
   main.view {
-    max-width: none;
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
+    width: calc(100% - 32px);
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
     padding-left: 0;
     padding-right: 0;
   }
@@ -920,15 +920,15 @@ nav.tabbar svg { width: 21px; height: 21px; }
 /* Desktop form/profile constraints */
 @media (min-width: 900px) {
   #view-add form, #form-add-product {
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
   }
   #view-profile .profile-card {
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
   }
   #view-profile .btn { width: auto; display: inline-block; }
-  .danger-zone { max-width: none; margin-left: 0; margin-right: 0; }
+  .danger-zone { max-width: 1100px; margin-left: auto; margin-right: auto; }
 }
