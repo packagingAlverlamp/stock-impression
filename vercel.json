@@ -12,7 +12,7 @@
   ],
   "crons": [
     {
-      "path": "/api/weekly-low-stock",
+      "path": "/api/weekly-low-stock.js",
       "schedule": "0 9 * * 1"
     }
   ]
