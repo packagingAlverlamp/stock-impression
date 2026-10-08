@@ -722,7 +722,7 @@ async function loadStockAnalytics() {
         <td data-label="Agotamientos">${stats.exhaustionCount}</td>
         <td data-label="Media entre agotamientos">${stats.averageExhaustionInterval === null ? "Aún sin media" : formatDurationDays(stats.averageExhaustionInterval)}</td>
         <td data-label="Consumo diario medio">${stats.dailyAverage === null ? "Datos insuficientes" : `${formatStockNumber(stats.dailyAverage)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}/día`}</td>
-        <td data-label="Stock estimado" class="${stats.coverageDays !== null && stats.coverageDays < 7 ? "analysis-low-coverage" : ""}">${stats.coverageDays === null ? "Sin estimación" : formatDurationDays(stats.coverageDays)}</td>
+        <td data-label="Stock estimado" class="${Number(stats.product.quantity) === 0 || (stats.coverageDays !== null && stats.coverageDays < 7) ? "analysis-low-coverage" : ""}">${Number(stats.product.quantity) === 0 ? "AGOTADO" : stats.coverageDays === null ? "Sin estimación" : formatDurationDays(stats.coverageDays)}</td>
       </tr>
     `).join("");
   } catch (error) {
