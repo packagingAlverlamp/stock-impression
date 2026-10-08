@@ -274,7 +274,7 @@ async function enterApp() {
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "add", "scan", "suppliers", "history", "analytics", "profile"];
+const VIEWS = ["list", "add", "scan", "suppliers", "analytics", "profile"];
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
@@ -297,8 +297,7 @@ function showView(name) {
   }
   if (name === "profile") renderProfile();
   if (name === "suppliers") loadSuppliers();
-  if (name === "history") loadStockHistory(true);
-  if (name === "analytics") loadStockAnalytics();
+  if (name === "analytics") showAnalyticsSection(activeAnalyticsSection);
   if (name === "list") {
     renderCategoryPills();
     requestAnimationFrame(() => {
@@ -306,6 +305,25 @@ function showView(name) {
       renderProductList();
     });
   }
+}
+
+let activeAnalyticsSection = "analytics";
+document.querySelectorAll(".analytics-view-btn").forEach((button) => {
+  button.addEventListener("click", () => showAnalyticsSection(button.dataset.analyticsView));
+});
+
+function showAnalyticsSection(name) {
+  activeAnalyticsSection = name;
+  document.querySelectorAll(".analytics-view-btn").forEach((button) => {
+    const active = button.dataset.analyticsView === name;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll(".analytics-panel").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.id !== `analytics-panel-${name}`);
+  });
+  if (name === "history") loadStockHistory(true);
+  if (name === "analytics") loadStockAnalytics();
 }
 
 

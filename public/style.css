@@ -434,6 +434,27 @@ main.view:not(.hidden) {
   color: var(--red);
   font-weight: 700;
 }
+.analytics-subnav {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.analytics-view-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 600;
+  cursor: pointer;
+}
+.analytics-view-btn.active {
+  border-bottom-color: var(--teal);
+  color: var(--teal);
+}
+.analytics-panel .section-title { margin-top: 0; }
 .analysis-footnote { max-width: 900px; line-height: 1.5; }
 .name-prefix-filters {
   display: flex;
@@ -802,28 +823,28 @@ h2.section-title {
     gap: 10px;
   }
 
-  #view-history .history-table-shell,
+  #view-analytics .history-table-shell,
   #view-analytics .analysis-table-shell {
     overflow-x: auto;
     border-radius: 14px;
   }
 
-  #view-history .movement-table,
+  #view-analytics .movement-table,
   #view-analytics .analysis-table {
     display: table;
   }
 
-  #view-history .movement-table tbody,
+  #view-analytics .movement-table tbody,
   #view-analytics .analysis-table tbody {
     display: table-row-group;
   }
 
-  #view-history .movement-table thead,
+  #view-analytics .movement-table thead,
   #view-analytics .analysis-table thead {
     display: table-header-group;
   }
 
-  #view-history .movement-table tbody tr,
+  #view-analytics .movement-table tbody tr,
   #view-analytics .analysis-table tbody tr {
     display: table-row;
     width: auto;
@@ -834,7 +855,7 @@ h2.section-title {
     background: transparent;
   }
 
-  #view-history .movement-table tbody td,
+  #view-analytics .movement-table tbody td,
   #view-analytics .analysis-table tbody td {
     display: table-cell;
     width: auto;
@@ -843,7 +864,7 @@ h2.section-title {
     border-bottom: 1px solid var(--line);
   }
 
-  #view-history .movement-table tbody td::before,
+  #view-analytics .movement-table tbody td::before,
   #view-analytics .analysis-table tbody td::before {
     content: none;
   }
@@ -1402,6 +1423,15 @@ nav.tabbar svg { width: 21px; height: 21px; }
   #view-list {
     max-width: none;
     width: 100%;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  #view-analytics {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
     padding-left: 28px;
     padding-right: 28px;
   }
