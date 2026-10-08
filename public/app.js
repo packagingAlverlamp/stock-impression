@@ -7,6 +7,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
+let allSuppliers = [];
 let activeCategoryFilter = '';
 const LOW_STOCK_CATEGORY_KEY = '__low_stock__';
 const CATEGORY_ORDER_COOKIE = 'stock_impresion_category_order';
@@ -243,18 +244,30 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
   }
 });
 
+function safeRenderInventoryState() {
+  if (!$("category-pills") || !$("product-list") || !$("search-input")) return;
+  renderCategoryPills();
+  renderProductList();
+}
+
 async function enterApp() {
   $("view-auth").classList.add("hidden");
   $("app").classList.remove("hidden");
   await loadProfile();
+  await loadSuppliers();
   await loadProducts();
+  safeRenderInventoryState();
   showView("list");
+  requestAnimationFrame(() => {
+    renderCategoryPills();
+    renderProductList();
+  });
 }
 
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "add", "scan", "profile"];
+const VIEWS = ["list", "add", "scan", "suppliers", "profile"];
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
@@ -276,7 +289,16 @@ function showView(name) {
     stopStockScanner();
   }
   if (name === "profile") renderProfile();
+  if (name === "suppliers") loadSuppliers();
+  if (name === "list") {
+    renderCategoryPills();
+    requestAnimationFrame(() => {
+      renderCategoryPills();
+      renderProductList();
+    });
+  }
 }
+
 
 // ---------------------------------------------------------------
 // Perfil
@@ -363,20 +385,240 @@ $("delete-account-btn").addEventListener("click", async () => {
 // ---------------------------------------------------------------
 // Inventario — carga y listado
 // ---------------------------------------------------------------
+async function loadSuppliers() {
+  const { data, error } = await supabaseClient
+    .from("suppliers")
+    .select("*")
+    .order("name", { ascending: true, nullsFirst: false });
+
+  if (error) {
+    const msg = String(error.message || "");
+    const isMissingTable = /relation .*suppliers.* does not exist|does not exist|not found.*suppliers|permission denied/i.test(msg);
+    if (isMissingTable) {
+      allSuppliers = [];
+      populateSupplierSelects();
+      renderSuppliersTable();
+      console.warn("La tabla public.suppliers todavía no existe en Supabase o no es accesible. Ejecuta la migración del esquema para poder guardarlos.");
+      return;
+    }
+    console.warn("No se pudieron cargar los proveedores:", error);
+    return;
+  }
+
+  allSuppliers = data || [];
+  populateSupplierSelects();
+  renderSuppliersTable();
+}
+
+function getSupplierOptionsHtml(selectedValue = "") {
+  const options = [
+    '<option value="">Sin proveedor</option>',
+    ...allSuppliers
+      .filter((supplier) => supplier.name)
+      .map((supplier) => `<option value="${escapeHtml(supplier.id)}" ${selectedValue === supplier.id ? "selected" : ""}>${escapeHtml(supplier.name)}</option>`),
+  ];
+
+  return options.join("");
+}
+
+function populateSupplierSelects() {
+  const addSelect = $("add-supplier");
+  if (addSelect) {
+    const current = addSelect.value || "";
+    addSelect.innerHTML = getSupplierOptionsHtml(current);
+    if (current && [...addSelect.options].some((option) => option.value === current)) {
+      addSelect.value = current;
+    } else {
+      addSelect.value = "";
+    }
+  }
+
+  const editSelect = $("edit-supplier");
+  if (editSelect) {
+    const current = editSelect.value || "";
+    editSelect.innerHTML = getSupplierOptionsHtml(current);
+    if (current && [...editSelect.options].some((option) => option.value === current)) {
+      editSelect.value = current;
+    } else {
+      editSelect.value = "";
+    }
+  }
+}
+
+function normalizeProduct(product) {
+  const { supplier_info: supplier, ...values } = product;
+  return { ...values, supplier: supplier || null };
+}
+
+function replaceProductInInventory(product) {
+  const index = allProducts.findIndex((existing) => existing.id === product.id);
+  if (index === -1) {
+    allProducts.push(product);
+  } else {
+    allProducts[index] = { ...allProducts[index], ...product };
+  }
+
+  allProducts.sort((a, b) => a.name.localeCompare(b.name));
+  renderProductList();
+  updateLowStockBadge();
+  populateDatalists();
+}
+
 async function loadProducts() {
   const { data, error } = await supabaseClient
     .from("products")
-    .select("*")
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
     .order("name", { ascending: true });
   if (error) {
     showToast("Error al cargar el inventario");
     return;
   }
-  allProducts = data || [];
+  allProducts = (data || []).map(normalizeProduct);
   renderProductList();
   updateLowStockBadge();
   populateDatalists();
+  renderCategoryPills();
+  requestAnimationFrame(() => {
+    renderCategoryPills();
+    renderProductList();
+  });
 }
+
+function renderSuppliersTable() {
+  const tbody = $("suppliers-table-body");
+  if (!tbody) return;
+
+  if (!allSuppliers.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="table-empty-cell">Todavía no hay proveedores guardados.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = allSuppliers
+    .map((supplier) => {
+      const emails = (supplier.email || "")
+        .split(";")
+        .map((email) => email.trim())
+        .filter(Boolean);
+
+      return `
+        <tr>
+          <td class="supplier-name-cell">${escapeHtml(supplier.name || "—")}</td>
+          <td data-label="Email">${escapeHtml(emails.length ? emails.join("; ") : "—")}</td>
+          <td data-label="Teléfono">${escapeHtml(supplier.phone || "—")}</td>
+          <td class="supplier-actions" data-label="Acciones">
+            <button type="button" class="btn btn-outline supplier-edit-btn" data-supplier-id="${supplier.id}" aria-label="Editar proveedor" title="Editar proveedor">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 4 4 4M4 20l4-1 12-12a2.12 2.12 0 0 0-3-3L5 16l-1 4Z"/></svg>
+            </button>
+            <button type="button" class="btn btn-red supplier-delete-btn" data-supplier-id="${supplier.id}" aria-label="Borrar proveedor" title="Borrar proveedor">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 5v5m4-5v5"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  tbody.querySelectorAll(".supplier-edit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openSupplierModal(allSuppliers.find((supplier) => supplier.id === btn.dataset.supplierId)));
+  });
+
+  tbody.querySelectorAll(".supplier-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const supplier = allSuppliers.find((item) => item.id === btn.dataset.supplierId);
+      if (!supplier) return;
+      const sure = confirm(`¿Borrar el proveedor "${supplier.name || "sin nombre"}"? Los suministros asociados quedarán sin proveedor.`);
+      if (!sure) return;
+
+      try {
+        const { error } = await supabaseClient.from("suppliers").delete().eq("id", supplier.id);
+        if (error) throw error;
+
+        await loadSuppliers();
+        await loadProducts();
+        showToast("Proveedor eliminado");
+      } catch (error) {
+        showToast("No se pudo eliminar el proveedor: " + error.message);
+      }
+    });
+  });
+}
+
+function openSupplierModal(supplier = null) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet supplier-modal">
+      <div class="modal-header">
+        <h2>${supplier ? "Editar proveedor" : "Nuevo proveedor"}</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <form id="supplier-form">
+        <div class="field">
+          <label for="supplier-name">Nombre</label>
+          <input type="text" id="supplier-name" value="${escapeHtml(supplier?.name || "")}" placeholder="Ej: Epson" />
+        </div>
+        <div class="field">
+          <label for="supplier-email">Email</label>
+          <input type="text" id="supplier-email" value="${escapeHtml(supplier?.email || "")}" placeholder="Ej: compras@epson.com; pedidos@epson.com" />
+        </div>
+        <div class="field">
+          <label for="supplier-phone">Teléfono</label>
+          <input type="tel" id="supplier-phone" value="${escapeHtml(supplier?.phone || "")}" placeholder="Ej: 612 345 678" />
+        </div>
+        <button type="submit" class="btn btn-primary">${supplier ? "Guardar cambios" : "Guardar proveedor"}</button>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  backdrop.querySelector("#supplier-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = $("supplier-name").value.trim();
+    const email = $("supplier-email").value.trim();
+    const phone = $("supplier-phone").value.trim();
+
+    if (!name && !email && !phone) {
+      showToast("Rellena al menos un dato del proveedor.");
+      return;
+    }
+
+    const payload = {
+      name: name || null,
+      email: email || null,
+      phone: phone || null,
+    };
+
+    try {
+      if (supplier?.id) {
+        const { error } = await supabaseClient.from("suppliers").update(payload).eq("id", supplier.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabaseClient.from("suppliers").insert(payload);
+        if (error) throw error;
+      }
+
+      close();
+      await loadSuppliers();
+      await loadProducts();
+      showToast(supplier ? "Proveedor actualizado" : "Proveedor guardado");
+    } catch (error) {
+      showToast("No se pudo guardar el proveedor: " + error.message);
+    }
+  });
+}
+
+$("new-supplier-btn").addEventListener("click", () => openSupplierModal());
 
 function updateLowStockBadge() {
   const lowCount = allProducts.filter(isLowStock).length;
@@ -392,6 +634,7 @@ function updateLowStockBadge() {
 function populateDatalists() {
   const fill = (id, values) => {
     const dl = $(id);
+    if (!dl) return;
     dl.innerHTML = [...new Set(values.filter(Boolean))]
       .sort()
       .map((v) => `<option value="${escapeHtml(v)}"></option>`)
@@ -399,19 +642,25 @@ function populateDatalists() {
   };
   fill("list-categories", allProducts.map((p) => p.category));
   fill("list-locations", allProducts.map((p) => p.location));
-  fill("list-suppliers", allProducts.map((p) => p.supplier));
+  fill("list-suppliers", allProducts.map((p) => p.supplier?.name));
   const defaultUnits = ["Rollo", "Paquete", "Cartucho", "Caja", "Bote", "Unidad"];
   fill("list-units", [...defaultUnits, ...allProducts.map((p) => p.unit)]);
   renderCategoryPills();
 }
 
 function renderCategoryPills() {
+  if (!Array.isArray(allProducts)) return;
+
   const container = $("category-pills");
   if (!container) return;
 
   const orderedCats = getOrderedCategories();
   const items = ["Todos", "Poco stock", ...orderedCats];
   const isMobile = window.innerWidth < 900;
+  const totalCount = allProducts.length;
+  const lowStockCount = allProducts.filter(isLowStock).length;
+
+  if (!container.parentElement) return;
 
   if (isMobile) {
     const categoryOptions = orderedCats;
@@ -424,7 +673,8 @@ function renderCategoryPills() {
       <div class="mobile-category-quick-row">
         ${quickButtons.map((button) => {
           const isActive = activeCategoryFilter === button.value;
-          return `<button type="button" class="${button.className}${isActive ? ' active' : ''}" data-filter="${escapeHtml(button.value)}">${escapeHtml(button.label)}</button>`;
+          const count = button.value === LOW_STOCK_CATEGORY_KEY ? lowStockCount : totalCount;
+          return `<button type="button" class="${button.className}${isActive ? ' active' : ''}" data-filter="${escapeHtml(button.value)}">${escapeHtml(button.label)} <span class="count">${count}</span></button>`;
         }).join('')}
       </div>
       <label class="mobile-category-select-wrap">
@@ -432,7 +682,8 @@ function renderCategoryPills() {
           <option value="">Selecciona una categoría</option>
           ${categoryOptions.map((cat) => {
             const selected = activeCategoryFilter === cat;
-            return `<option value="${escapeHtml(cat)}" ${selected ? 'selected' : ''}>${escapeHtml(cat)}</option>`;
+            const catCount = allProducts.filter((p) => p.category === cat).length;
+            return `<option value="${escapeHtml(cat)}" ${selected ? 'selected' : ''}>${escapeHtml(cat)} (${catCount})</option>`;
           }).join('')}
         </select>
       </label>
@@ -462,23 +713,21 @@ function renderCategoryPills() {
     .map((c) => {
       const value = c === 'Todos' ? '' : c === 'Poco stock' ? LOW_STOCK_CATEGORY_KEY : c;
       const active = (c === 'Todos' ? activeCategoryFilter === '' : activeCategoryFilter === value);
-      const count = c === 'Poco stock' ? allProducts.filter(isLowStock).length : c === 'Todos' ? allProducts.length : allProducts.filter((p) => p.category === c).length;
-      const draggable = c !== 'Todos' && c !== 'Poco stock' ? 'true' : 'false';
-      return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(value)}" draggable="${draggable}" title="${escapeHtml(c)}">${escapeHtml(c)}${c !== 'Todos' && c !== 'Poco stock' ? ` <span class=\"count\">${count}</span>` : ''}${c === 'Poco stock' ? ` <span class=\"count\">${count}</span>` : ''}</button>`;
+      const count = c === 'Poco stock'
+        ? lowStockCount
+        : c === 'Todos'
+          ? totalCount
+          : allProducts.filter((p) => p.category === c).length;
+      return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(value)}" title="${escapeHtml(c)}">${escapeHtml(c)} <span class="count">${count}</span></button>`;
     })
     .join("");
 
   container.querySelectorAll('.pill').forEach((btn) => {
     const catValue = btn.dataset.cat;
     const isMovable = catValue !== '' && catValue !== LOW_STOCK_CATEGORY_KEY;
+    btn.draggable = isMovable;
 
     btn.addEventListener('click', () => {
-      if (!isMovable) {
-        activeCategoryFilter = catValue;
-        renderCategoryPills();
-        renderProductList();
-        return;
-      }
       activeCategoryFilter = catValue;
       renderCategoryPills();
       renderProductList();
@@ -533,10 +782,12 @@ clearSearchBtn.addEventListener("click", () => {
 });
 
 function renderProductList() {
+  if (!Array.isArray(allProducts)) return;
+
   const term = $("search-input").value.trim().toLowerCase();
   const filtered = allProducts.filter((p) => {
     if (!term) return true;
-    return [p.name, p.category, p.location, p.supplier, p.ean]
+    return [p.name, p.category, p.location, p.supplier?.name, p.ean]
       .filter(Boolean)
       .some((f) => f.toLowerCase().includes(term));
   });
@@ -573,7 +824,7 @@ function renderProductList() {
       const items = groups[cat]
         .map((p) => {
           const low = isLowStock(p);
-          const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(' / ');
+          const meta = [p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
           return `
             <div class="product-row ${low ? 'low' : ''}" data-id="${p.id}">
               <div class="product-main">
@@ -612,7 +863,7 @@ function renderProductList() {
     container.innerHTML = finalFiltered
       .map((p) => {
         const low = isLowStock(p);
-        const meta = [p.unit, p.location, p.supplier].filter(Boolean).join(' / ');
+        const meta = [p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
         return `
           <div class="product-row ${low ? 'low' : ''}">
             <div class="product-main" data-id="${p.id}">
@@ -728,7 +979,7 @@ function syncProductQuantityInDom(product) {
   }
 
   row.classList.toggle('low', isLowStock(product));
-  const meta = [product.unit, product.location, product.supplier].filter(Boolean).join(' / ');
+  const meta = [product.unit, product.location, product.supplier?.name].filter(Boolean).join(' / ');
   const metaNode = row.querySelector('.product-meta');
   if (metaNode) metaNode.textContent = meta;
 
@@ -751,23 +1002,26 @@ async function updateProductQuantity(productId, newQty) {
     .from("products")
     .update({ quantity: newQty })
     .eq("id", productId)
-    .select()
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
     .single();
   if (error) {
     showToast("Error al actualizar la cantidad");
     return null;
   }
 
+  const updatedProduct = normalizeProduct(data);
   const idx = allProducts.findIndex((p) => p.id === productId);
   if (idx >= 0) {
-    allProducts[idx] = { ...allProducts[idx], ...data };
+    allProducts[idx] = { ...allProducts[idx], ...updatedProduct };
   }
 
-  await checkLowStock(data);
-  syncProductQuantityInDom(allProducts[idx] || data);
+  syncProductQuantityInDom(allProducts[idx] || updatedProduct);
   updateLowStockBadge();
   populateDatalists();
-  return data;
+  if (activeCategoryFilter === LOW_STOCK_CATEGORY_KEY) renderProductList();
+
+  await checkLowStock(updatedProduct);
+  return updatedProduct;
 }
 
 async function checkLowStock(product) {
@@ -782,7 +1036,14 @@ async function checkLowStock(product) {
 
 function buildLowStockEmailHtml(product) {
   const unit = product.unit || "uds";
-  const title = `Stock bajo: ${product.name}`;
+  const supplier = product.supplier;
+  const supplierName = supplier?.name || "Sin proveedor";
+  const supplierEmails = (supplier?.email || "")
+    .split(";")
+    .map((email) => email.trim())
+    .filter(Boolean);
+  const supplierPhone = supplier?.phone || "";
+
   return `
     <div style="font-family: Arial, sans-serif; color: #1e1e1e; max-width: 640px; margin: 0 auto; background: #f7f7f7; padding: 24px; border-radius: 12px;">
       <div style="background: #111827; color: #ffffff; border-radius: 10px 10px 0 0; padding: 18px 20px;">
@@ -794,6 +1055,12 @@ function buildLowStockEmailHtml(product) {
         <div style="font-size: 24px; font-weight: 700; margin-bottom: 12px;">${escapeHtml(product.name)}</div>
         <div style="font-size: 16px; line-height: 1.6; color: #374151; margin-bottom: 18px;">
           El suministro <strong>${escapeHtml(product.name)}</strong> tiene <strong>${product.quantity}</strong> ${escapeHtml(unit)} y ha llegado al mínimo definido de <strong>${product.min_quantity}</strong>.
+        </div>
+        <div style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; color: #374151;">
+          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 8px;">Proveedor</div>
+          <div style="font-weight: 700; margin-bottom: 4px;">${escapeHtml(supplierName)}</div>
+          ${supplierEmails.length ? supplierEmails.map((email) => `<div>Email: ${escapeHtml(email)}</div>`).join("") : ""}
+          ${supplierPhone ? `<div>Teléfono: ${escapeHtml(supplierPhone)}</div>` : ""}
         </div>
         <div style="background: #fff1f2; border-left: 4px solid #dc2626; padding: 12px 14px; border-radius: 8px; color: #7f1d1d; font-weight: 600;">
           Reponlo cuanto antes para evitar quedarse sin stock.
@@ -819,12 +1086,19 @@ async function sendLowStockEmail(product) {
     const emails = (profiles || []).map((p) => p.email).filter(Boolean);
     if (emails.length === 0) return;
 
+    const supplier = product.supplier;
+    const supplierEmails = (supplier?.email || "")
+      .split(";")
+      .map((email) => email.trim())
+      .filter(Boolean);
+    const supplierSummary = [supplier?.name, supplierEmails.length ? supplierEmails.join("; ") : supplier?.email, supplier?.phone].filter(Boolean).join(" • ") || "Sin proveedor";
     const subject = `Stock bajo: ${product.name}`;
     const message = [
       `El suministro \"${product.name}\" está por debajo del mínimo.`,
       `- Stock actual: ${product.quantity}`,
       `- Mínimo: ${product.min_quantity}`,
       `- Unidad: ${product.unit || "unidades"}`,
+      `- Proveedor: ${supplierSummary}`,
       "",
       "Reponlo cuando puedas.",
       "",
@@ -841,6 +1115,9 @@ async function sendLowStockEmail(product) {
           product_name: product.name,
           quantity: product.quantity,
           min_quantity: product.min_quantity,
+          supplier_name: supplier?.name || "Sin proveedor",
+          supplier_email: supplier?.email || "",
+          supplier_phone: supplier?.phone || "",
         };
         try {
           return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY);
@@ -930,7 +1207,9 @@ function openEditModal(productId) {
           </div>
           <div class="field">
             <label>Proveedor</label>
-            <input type="text" id="edit-supplier" list="list-suppliers" value="${escapeHtml(p.supplier || "")}" />
+            <select id="edit-supplier">
+              ${getSupplierOptionsHtml(p.supplier_id || "")}
+            </select>
           </div>
         </div>
         <div class="two-col">
@@ -961,7 +1240,7 @@ function openEditModal(productId) {
       category: $("edit-category").value.trim() || null,
       unit: $("edit-unit").value.trim() || null,
       location: $("edit-location").value.trim() || null,
-      supplier: $("edit-supplier").value.trim() || null,
+      supplier_id: $("edit-supplier").value || null,
       quantity: Number($("edit-quantity").value),
       min_quantity: Number($("edit-min").value),
     };
@@ -969,16 +1248,17 @@ function openEditModal(productId) {
       .from("products")
       .update(updated)
       .eq("id", p.id)
-      .select()
+      .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
       .single();
     if (error) {
       showToast("Error al guardar: " + error.message);
       return;
     }
-    await checkLowStock(data);
+    const updatedProduct = normalizeProduct(data);
+    replaceProductInInventory(updatedProduct);
+    await checkLowStock(updatedProduct);
     close();
     showToast("Suministro actualizado");
-    loadProducts();
   });
 
   backdrop.querySelector("#edit-delete-btn").addEventListener("click", async () => {
@@ -1042,12 +1322,16 @@ $("form-add-product").addEventListener("submit", async (e) => {
     category: $("add-category").value.trim() || null,
     unit: $("add-unit").value.trim() || null,
     location: $("add-location").value.trim() || null,
-    supplier: $("add-supplier").value.trim() || null,
+    supplier_id: $("add-supplier").value || null,
     quantity: Number($("add-quantity").value),
     min_quantity: Number($("add-min").value),
   };
 
-  const { data, error } = await supabaseClient.from("products").insert(payload).select().single();
+  const { data, error } = await supabaseClient
+    .from("products")
+    .insert(payload)
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
+    .single();
   if (error) {
     if (error.message.includes("duplicate")) {
       showToast("Ya existe un suministro con ese código EAN");
@@ -1057,7 +1341,7 @@ $("form-add-product").addEventListener("submit", async (e) => {
     return;
   }
 
-  await checkLowStock(data);
+  await checkLowStock(normalizeProduct(data));
   showToast("Suministro añadido");
   e.target.reset();
   $("add-quantity").value = 0;

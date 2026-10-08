@@ -11,6 +11,29 @@
 </head>
 <body>
 
+  <nav class="tabbar">
+    <button type="button" class="tab-btn active" data-view="list">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      Inventario
+    </button>
+    <button type="button" class="tab-btn" data-view="add">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+      Añadir
+    </button>
+    <button type="button" class="tab-btn" data-view="scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
+      Escanear
+    </button>
+    <button type="button" class="tab-btn" data-view="suppliers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
+      Proveedores
+    </button>
+    <button type="button" class="tab-btn" data-view="profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+      Perfil
+    </button>
+  </nav>
+
 <div id="shell">
 
   <!-- ======================= AUTENTICACIÓN ======================= -->
@@ -137,8 +160,9 @@
           </div>
           <div class="field">
             <label for="add-supplier">Proveedor</label>
-            <input type="text" id="add-supplier" list="list-suppliers" placeholder="Ej: Epson" />
-            <datalist id="list-suppliers"></datalist>
+            <select id="add-supplier">
+              <option value="">Sin proveedor</option>
+            </select>
           </div>
         </div>
         <div class="two-col">
@@ -168,6 +192,28 @@
       <p class="scan-hint" id="scan-hint">Apunta con la cámara al código de barras del producto</p>
 
       <div id="scan-result" class="hidden"></div>
+    </main>
+
+    <!-- ---------- Vista: Proveedores ---------- -->
+    <main id="view-suppliers" class="view hidden">
+      <div class="section-header">
+        <h2 class="section-title">Proveedores</h2>
+        <button type="button" id="new-supplier-btn" class="btn btn-teal">Nuevo proveedor</button>
+      </div>
+
+      <div class="table-shell">
+        <table class="supplier-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="suppliers-table-body"></tbody>
+        </table>
+      </div>
     </main>
 
     <!-- ---------- Vista: Perfil ---------- -->
@@ -210,26 +256,6 @@
         <button type="button" class="btn btn-red" id="delete-account-btn">Eliminar mi cuenta</button>
       </div>
     </main>
-
-    <!-- ---------- Navegación inferior ---------- -->
-    <nav class="tabbar">
-      <button type="button" class="tab-btn active" data-view="list">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-        Inventario
-      </button>
-      <button type="button" class="tab-btn" data-view="add">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
-        Añadir
-      </button>
-      <button type="button" class="tab-btn" data-view="scan">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
-        Escanear
-      </button>
-      <button type="button" class="tab-btn" data-view="profile">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
-        Perfil
-      </button>
-    </nav>
 
   </div>
 

@@ -54,6 +54,49 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- ------------------------------------------------------------
+-- TABLA: suppliers
+-- Directorio compartido de proveedores con nombre, email y teléfono
+-- ------------------------------------------------------------
+create table public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  phone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.suppliers enable row level security;
+
+create unique index suppliers_name_unique_idx
+  on public.suppliers (lower(trim(name)))
+  where name is not null and btrim(name) <> '';
+
+create policy "usuarios_ven_proveedores"
+  on public.suppliers for select to authenticated using (true);
+
+create policy "usuarios_crean_proveedores"
+  on public.suppliers for insert to authenticated with check (true);
+
+create policy "usuarios_editan_proveedores"
+  on public.suppliers for update to authenticated using (true);
+
+create policy "usuarios_borran_proveedores"
+  on public.suppliers for delete to authenticated using (true);
+
+create or replace function public.set_supplier_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger suppliers_set_updated_at
+before update on public.suppliers
+for each row execute procedure public.set_supplier_updated_at();
+
+-- ------------------------------------------------------------
 -- TABLA: products
 -- Inventario compartido de suministros
 -- ------------------------------------------------------------
@@ -63,7 +106,7 @@ create table public.products (
   name text not null,
   category text,
   location text,
-  supplier text,
+  supplier_id uuid references public.suppliers(id) on delete set null,
   unit text,
   quantity numeric not null default 0,
   min_quantity numeric not null default 0,
@@ -104,5 +147,8 @@ for each row execute procedure public.set_updated_at();
 -- ------------------------------------------------------------
 -- Índices útiles
 -- ------------------------------------------------------------
+create index products_supplier_id_idx on public.products (supplier_id);
 create index products_name_idx on public.products (name);
 create index products_ean_idx on public.products (ean);
+
+-- Supplier assignments are stored only through supplier_id.
