@@ -235,7 +235,6 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
   if (session && session.user) {
     currentUser = session.user;
     enterApp();
-    maybeSendWeeklyLowStockDigest();
   } else {
     currentUser = null;
     $("app").classList.add("hidden");
@@ -1143,25 +1142,6 @@ async function sendLowStockEmail(product) {
     });
   } catch (err) {
     console.error("No se pudo enviar el aviso por email:", err);
-  }
-}
-
-async function maybeSendWeeklyLowStockDigest() {
-  try {
-    const today = new Date();
-    const day = today.getDay(); // Sunday=0, Monday=1
-    if (day !== 1) return;
-
-    const key = 'stock-impresion-last-weekly-digest';
-    const iso = today.toISOString().slice(0, 10);
-    if (localStorage.getItem(key) === iso) return;
-
-    const res = await fetch('/api/weekly-low-stock', { method: 'POST' });
-    if (res.ok) {
-      localStorage.setItem(key, iso);
-    }
-  } catch (err) {
-    console.warn('No se pudo disparar el resumen semanal:', err);
   }
 }
 
