@@ -1182,16 +1182,17 @@ nav.tabbar svg { width: 21px; height: 21px; }
   }
 
   .column-list {
+    display: grid;
     column-gap: 12px;
+    row-gap: 12px;
     width: 100%;
     overflow: hidden;
   }
 
   .column-list .product-row {
-    display: inline-block;
+    display: flex;
     width: 100%;
-    break-inside: avoid;
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .modal-backdrop {

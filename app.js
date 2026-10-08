@@ -856,7 +856,7 @@ function renderProductList() {
     container.innerHTML = '';
     container.appendChild(wrap);
     // after rendering, adjust columns that overflow to show two columns side-by-side
-    setTimeout(adjustCategoryWidths, 50);
+    adjustCategoryWidths();
   } else {
     // mobile: single-column list (existing behaviour)
     container.innerHTML = finalFiltered
@@ -911,12 +911,16 @@ function adjustCategoryWidths() {
       const list = col.querySelector('.column-list');
       if (!list) return;
 
+      const productCount = list.querySelectorAll('.product-row').length;
       col.style.width = '100%';
       col.style.minWidth = '100%';
       col.style.flex = '1 0 auto';
-      list.style.columnCount = '4';
-      list.style.columnWidth = `${cardWidth}px`;
+      list.style.display = 'grid';
+      list.style.gridAutoFlow = 'column';
+      list.style.gridTemplateColumns = `repeat(4, minmax(0, ${cardWidth}px))`;
+      list.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(productCount / 4))}, auto)`;
       list.style.columnGap = '12px';
+      list.style.rowGap = '12px';
       list.style.width = '100%';
     });
     return;
@@ -938,11 +942,16 @@ function adjustCategoryWidths() {
 
     const share = Number(col.dataset.cardColumns || 1);
     const width = (share / visibleShare) * available;
+    const productCount = list.querySelectorAll('.product-row').length;
     col.style.width = `${Math.max(width, 240)}px`;
     col.style.minWidth = `${Math.max(width, 240)}px`;
     col.style.flex = '0 0 auto';
-    list.style.columnCount = String(share);
+    list.style.display = 'grid';
+    list.style.gridAutoFlow = 'column';
+    list.style.gridTemplateColumns = `repeat(${share}, minmax(0, 1fr))`;
+    list.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(productCount / share))}, auto)`;
     list.style.columnGap = '12px';
+    list.style.rowGap = '12px';
     list.style.width = '100%';
     list.style.overflow = 'hidden';
   });
