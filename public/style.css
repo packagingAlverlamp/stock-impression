@@ -1211,7 +1211,16 @@ nav.tabbar svg { width: 21px; height: 21px; }
     column-gap: 12px;
     row-gap: 12px;
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
+  }
+
+  .category-column {
+    padding: 8px 10px 14px;
+  }
+
+  .col-title {
+    margin: 0 0 8px;
+    line-height: 1.4;
   }
 
   .column-list .product-row {

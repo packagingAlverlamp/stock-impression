@@ -985,7 +985,7 @@ function adjustCategoryWidths() {
   const gap = 12;
 
   if (activeCategoryFilter) {
-    const cardWidth = wrap.clientWidth * 0.25;
+    const cardWidth = (wrap.clientWidth - 20 - (12 * 3)) / 4;
     columns.forEach((col) => {
       const list = col.querySelector('.column-list');
       if (!list) return;
@@ -1032,7 +1032,7 @@ function adjustCategoryWidths() {
     list.style.columnGap = '12px';
     list.style.rowGap = '12px';
     list.style.width = '100%';
-    list.style.overflow = 'hidden';
+    list.style.overflow = 'visible';
   });
 }
 
