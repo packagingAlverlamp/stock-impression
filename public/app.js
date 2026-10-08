@@ -102,6 +102,10 @@ function isLowStock(p) {
   return Number(p.quantity) <= Number(p.min_quantity);
 }
 
+function getLowStockLabel(product) {
+  return Number(product.quantity) === 0 ? 'AGOTADO' : 'Queda poco';
+}
+
 // ---------------------------------------------------------------
 // Autenticación
 // ---------------------------------------------------------------
@@ -907,7 +911,7 @@ function renderProductList() {
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
                   <div class="product-qty-wrap">
                     <div class="product-qty ${low ? 'low' : ''}" style="font-size:16px">${p.quantity}</div>
-                    ${low ? '<div class="low-flag">Queda poco</div>' : ''}
+                    ${low ? `<div class="low-flag">${getLowStockLabel(p)}</div>` : ''}
                   </div>
                   <div class="qty-stepper">
                     <button type="button" data-id="${p.id}" data-delta="1">+</button>
@@ -944,7 +948,7 @@ function renderProductList() {
               <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
               <p class="product-meta">${escapeHtml(meta)}</p>
               <span class="product-qty ${low ? 'low' : ''}">${p.quantity}</span>
-              ${low ? '<span class="low-flag">Queda poco</span>' : ''}
+              ${low ? `<span class="low-flag">${getLowStockLabel(p)}</span>` : ''}
             </div>
             <div class="qty-stepper">
               <button type="button" data-id="${p.id}" data-delta="1">+</button>
@@ -1045,41 +1049,6 @@ async function applyQuantityDelta(product, delta) {
   return updateProductQuantity(product.id, newQty);
 }
 
-function syncProductQuantityInDom(product) {
-  const row = document.querySelector(`.product-row[data-id="${product.id}"]`);
-  if (!row) return;
-
-  const qtyNodes = row.querySelectorAll('.product-qty');
-  qtyNodes.forEach((node) => {
-    node.textContent = String(product.quantity);
-    node.classList.toggle('low', isLowStock(product));
-  });
-
-  const lowFlag = row.querySelector('.low-flag');
-  if (lowFlag) {
-    lowFlag.classList.toggle('hidden', !isLowStock(product));
-    lowFlag.textContent = 'Queda poco';
-  }
-
-  row.classList.toggle('low', isLowStock(product));
-  const meta = [product.unit, product.location, product.supplier?.name].filter(Boolean).join(' / ');
-  const metaNode = row.querySelector('.product-meta');
-  if (metaNode) metaNode.textContent = meta;
-
-  const main = row.querySelector('.product-main');
-  if (main) {
-    const qtyWrap = main.querySelector('.product-qty-wrap');
-    if (qtyWrap) {
-      const qty = qtyWrap.querySelector('.product-qty');
-      if (qty) qty.textContent = String(product.quantity);
-      const lowNode = qtyWrap.querySelector('.low-flag');
-      if (lowNode) {
-        lowNode.classList.toggle('hidden', !isLowStock(product));
-      }
-    }
-  }
-}
-
 async function updateProductQuantity(productId, newQty) {
   const { data, error } = await supabaseClient
     .from("products")
@@ -1098,10 +1067,9 @@ async function updateProductQuantity(productId, newQty) {
     allProducts[idx] = { ...allProducts[idx], ...updatedProduct };
   }
 
-  syncProductQuantityInDom(allProducts[idx] || updatedProduct);
   updateLowStockBadge();
   populateDatalists();
-  if (activeCategoryFilter === LOW_STOCK_CATEGORY_KEY) renderProductList();
+  renderProductList();
 
   await checkLowStock(updatedProduct);
   return updatedProduct;
