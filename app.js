@@ -885,7 +885,9 @@ function renderProductList() {
   if (isDesktop) {
     // Group products by category and render columns
     const groups = finalFiltered.reduce((acc, p) => {
-      const key = p.category || 'Sin categoría';
+      const key = activeCategoryFilter === LOW_STOCK_CATEGORY_KEY
+        ? 'Poco stock'
+        : p.category || 'Sin categoría';
       acc[key] = acc[key] || [];
       acc[key].push(p);
       return acc;
