@@ -133,6 +133,15 @@ genera solo, sin coste.
 
 ## Notas importantes
 
+- **Registro y análisis de stock**: la aplicación guarda cada alta, entrada y
+  salida de cantidad con fecha y usuario. Para actualizar una instalación
+  existente, aplica la migración
+  `supabase/migrations/20261008130000_stock_movements_and_analytics.sql`
+  desde Supabase CLI con `supabase db push`. La migración registra el stock
+  actual como saldo inicial; no puede recuperar movimientos anteriores.
+  Las medias de consumo y de tiempo entre agotamientos son estimaciones que
+  se vuelven más representativas con el uso.
+
 - **Privacidad interna**: al ser un inventario compartido, cualquier
   persona registrada puede ver el email de las demás (es necesario para
   poder avisarles). No hay datos de terceros expuestos públicamente.
@@ -188,4 +197,3 @@ Si prefieres que lo gestione yo, indícame si quieres:
 
 - Que prepare el commit con `config.js` apuntando al endpoint y lo empuje (necesitas añadir la variable `SENDGRID_API_KEY` en Vercel antes de probar).
 - O que use otro proveedor (Mailgun, SMTP) — en ese caso dame preferencia.
-

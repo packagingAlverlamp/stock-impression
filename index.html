@@ -28,6 +28,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
       Proveedores
     </button>
+    <button type="button" class="tab-btn" data-view="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8m0-5v5h5m4-1v5l3 2"/></svg>
+      Registro
+    </button>
+    <button type="button" class="tab-btn" data-view="analytics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-4 3 2 5-6"/></svg>
+      Análisis
+    </button>
     <button type="button" class="tab-btn" data-view="profile">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
       Perfil
@@ -214,6 +222,74 @@
           <tbody id="suppliers-table-body"></tbody>
         </table>
       </div>
+    </main>
+
+    <!-- ---------- Vista: Registro de movimientos ---------- -->
+    <main id="view-history" class="view hidden">
+      <h2 class="section-title">Registro de stock</h2>
+      <p class="page-intro">Entradas, salidas y ajustes de inventario, ordenados del más reciente al más antiguo.</p>
+      <div class="history-filters">
+        <label class="field">
+          <span>Suministro</span>
+          <select id="history-product-filter">
+            <option value="">Todos los suministros</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Movimiento</span>
+          <select id="history-type-filter">
+            <option value="">Todos</option>
+            <option value="initial">Alta inicial</option>
+            <option value="baseline">Saldo inicial del registro</option>
+            <option value="entry">Entrada</option>
+            <option value="withdrawal">Salida</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-shell movement-table-shell">
+        <table class="supplier-table movement-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Suministro</th>
+              <th>Movimiento</th>
+              <th>Cambio</th>
+              <th>Stock resultante</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body"></tbody>
+        </table>
+      </div>
+      <p id="history-status" class="table-status" role="status"></p>
+      <button type="button" id="history-load-more" class="btn btn-outline history-load-more hidden">Cargar movimientos anteriores</button>
+    </main>
+
+    <!-- ---------- Vista: Análisis de consumo ---------- -->
+    <main id="view-analytics" class="view hidden">
+      <h2 class="section-title">Análisis de consumo</h2>
+      <p class="page-intro">Estimaciones calculadas a partir de las salidas registradas y el tiempo con stock disponible.</p>
+      <div class="analysis-notice">
+        El historial comienza el <strong id="analysis-start-date">—</strong>. Los movimientos anteriores a esa fecha no están disponibles, así que las medias mejorarán a medida que se registren más datos.
+      </div>
+      <div class="table-shell analysis-table-shell">
+        <table class="supplier-table analysis-table">
+          <thead>
+            <tr>
+              <th>Suministro</th>
+              <th>Stock actual</th>
+              <th>Entradas</th>
+              <th>Salidas</th>
+              <th>Agotamientos</th>
+              <th>Media entre agotamientos</th>
+              <th>Consumo diario medio</th>
+              <th>Stock estimado</th>
+            </tr>
+          </thead>
+          <tbody id="analysis-table-body"></tbody>
+        </table>
+      </div>
+      <p class="analysis-footnote">La estimación de duración usa el consumo medio diario observado mientras había stock. Es orientativa y no incluye periodos en los que el suministro estuvo agotado.</p>
     </main>
 
     <!-- ---------- Vista: Perfil ---------- -->

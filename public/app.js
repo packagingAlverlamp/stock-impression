@@ -8,6 +8,9 @@ let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
 let allSuppliers = [];
+let historyOffset = 0;
+let historyTotal = 0;
+let historyRows = [];
 let activeCategoryFilter = '';
 let activeNamePrefixFilter = '';
 const LOW_STOCK_CATEGORY_KEY = '__low_stock__';
@@ -271,7 +274,7 @@ async function enterApp() {
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "add", "scan", "suppliers", "profile"];
+const VIEWS = ["list", "add", "scan", "suppliers", "history", "analytics", "profile"];
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
@@ -294,6 +297,8 @@ function showView(name) {
   }
   if (name === "profile") renderProfile();
   if (name === "suppliers") loadSuppliers();
+  if (name === "history") loadStockHistory(true);
+  if (name === "analytics") loadStockAnalytics();
   if (name === "list") {
     renderCategoryPills();
     requestAnimationFrame(() => {
@@ -478,6 +483,7 @@ async function loadProducts() {
     return;
   }
   allProducts = (data || []).map(normalizeProduct);
+  populateHistoryProductFilter();
   renderProductList();
   updateLowStockBadge();
   populateDatalists();
@@ -487,6 +493,248 @@ async function loadProducts() {
     renderProductList();
   });
 }
+
+function populateHistoryProductFilter() {
+  const select = $("history-product-filter");
+  if (!select) return;
+
+  const selected = select.value;
+  select.innerHTML = `<option value="">Todos los suministros</option>${allProducts
+    .map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`)
+    .join("")}`;
+  if (allProducts.some((product) => product.id === selected)) select.value = selected;
+}
+
+function formatStockNumber(value) {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Number(value) || 0);
+}
+
+function formatMovementDate(value) {
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function movementTypeLabel(type) {
+  return {
+    initial: "Alta inicial",
+    baseline: "Saldo inicial",
+    entry: "Entrada",
+    withdrawal: "Salida",
+  }[type] || "Movimiento";
+}
+
+function renderStockHistory() {
+  const tbody = $("history-table-body");
+  if (!tbody) return;
+
+  if (!historyRows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">No hay movimientos que coincidan con los filtros.</td></tr>';
+  } else {
+    tbody.innerHTML = historyRows.map((movement) => {
+      const delta = Number(movement.quantity_delta);
+      const deltaLabel = movement.movement_type === "baseline"
+        ? "—"
+        : `${delta > 0 ? "+" : delta < 0 ? "−" : ""}${formatStockNumber(Math.abs(delta))}`;
+      const before = movement.quantity_before === null
+        ? "—"
+        : formatStockNumber(movement.quantity_before);
+
+      return `
+        <tr>
+          <td data-label="Fecha">${escapeHtml(formatMovementDate(movement.created_at))}</td>
+          <td data-label="Suministro" class="movement-product-cell">${escapeHtml(movement.product_name)}</td>
+          <td data-label="Movimiento"><span class="movement-type ${escapeHtml(movement.movement_type)}">${escapeHtml(movementTypeLabel(movement.movement_type))}</span></td>
+          <td data-label="Cambio" class="movement-delta ${delta < 0 ? "negative" : delta > 0 ? "positive" : ""}">${deltaLabel}</td>
+          <td data-label="Stock resultante">${before} → ${formatStockNumber(movement.quantity_after)}${movement.unit ? ` ${escapeHtml(movement.unit)}` : ""}</td>
+          <td data-label="Usuario">${escapeHtml(movement.user_email || "Sistema")}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  const status = $("history-status");
+  status.textContent = historyTotal
+    ? `Mostrando ${historyRows.length} de ${historyTotal} movimientos.`
+    : "";
+  $("history-load-more").classList.toggle("hidden", historyRows.length >= historyTotal);
+}
+
+async function loadStockHistory(reset = false) {
+  if (reset) {
+    historyOffset = 0;
+    historyTotal = 0;
+    historyRows = [];
+  }
+
+  const status = $("history-status");
+  status.textContent = "Cargando movimientos…";
+  const productId = $("history-product-filter").value;
+  const movementType = $("history-type-filter").value;
+  const pageSize = 100;
+
+  let request = supabaseClient
+    .from("stock_movements")
+    .select("id, product_id, product_name, unit, movement_type, quantity_before, quantity_after, quantity_delta, user_email, created_at", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(historyOffset, historyOffset + pageSize - 1);
+  if (productId) request = request.eq("product_id", productId);
+  if (movementType) request = request.eq("movement_type", movementType);
+
+  const { data, count, error } = await request;
+  if (error) {
+    status.textContent = "No se pudo cargar el registro de stock.";
+    showToast("Error al cargar el registro: " + error.message);
+    return;
+  }
+
+  historyRows = reset ? (data || []) : [...historyRows, ...(data || [])];
+  historyTotal = count || 0;
+  historyOffset = historyRows.length;
+  renderStockHistory();
+}
+
+async function loadAllStockMovements() {
+  const pageSize = 1000;
+  const selection = "id, product_id, product_name, movement_type, quantity_before, quantity_after, quantity_delta, created_at";
+  const { data: firstPage, count, error } = await supabaseClient
+    .from("stock_movements")
+    .select(selection, { count: "exact" })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(0, pageSize - 1);
+  if (error) throw error;
+
+  const pages = await Promise.all(Array.from(
+    { length: Math.ceil(Math.max(0, (count || 0) - pageSize) / pageSize) },
+    (_, index) => {
+      const from = (index + 1) * pageSize;
+      return supabaseClient
+        .from("stock_movements")
+        .select(selection)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+    }
+  ));
+  const failedPage = pages.find((page) => page.error);
+  if (failedPage?.error) throw failedPage.error;
+
+  return [
+    ...(firstPage || []),
+    ...pages.flatMap((page) => page.data || []),
+  ];
+}
+
+function formatDurationDays(value) {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  if (value < 1) return "Menos de 1 día";
+  const rounded = Math.round(value);
+  return `${rounded} ${rounded === 1 ? "día" : "días"}`;
+}
+
+function buildProductConsumptionStats(product, movements, now) {
+  const events = movements
+    .filter((movement) => movement.product_id === product.id)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id);
+  let incoming = 0;
+  let outgoing = 0;
+  let activeMilliseconds = 0;
+  const exhaustedAt = [];
+
+  events.forEach((movement) => {
+    const delta = Number(movement.quantity_delta);
+    if (movement.movement_type === "initial" || movement.movement_type === "entry") {
+      incoming += Math.max(0, delta);
+    }
+    if (movement.movement_type === "withdrawal") {
+      outgoing += Math.max(0, -delta);
+      if (Number(movement.quantity_before) > 0 && Number(movement.quantity_after) === 0) {
+        exhaustedAt.push(new Date(movement.created_at).getTime());
+      }
+    }
+  });
+
+  for (let index = 0; index < events.length; index += 1) {
+    const start = new Date(events[index].created_at).getTime();
+    const end = index + 1 < events.length
+      ? new Date(events[index + 1].created_at).getTime()
+      : now.getTime();
+    if (Number(events[index].quantity_after) > 0) {
+      activeMilliseconds += Math.max(0, end - start);
+    }
+  }
+
+  const activeDays = activeMilliseconds / 86400000;
+  const dailyAverage = activeDays > 0 ? outgoing / activeDays : null;
+  const coverageDays = dailyAverage > 0 ? Number(product.quantity) / dailyAverage : null;
+  const exhaustionIntervals = exhaustedAt.slice(1).map((timestamp, index) =>
+    (timestamp - exhaustedAt[index]) / 86400000
+  );
+  const averageExhaustionInterval = exhaustionIntervals.length
+    ? exhaustionIntervals.reduce((sum, days) => sum + days, 0) / exhaustionIntervals.length
+    : null;
+
+  return {
+    product,
+    incoming,
+    outgoing,
+    exhaustionCount: exhaustedAt.length,
+    averageExhaustionInterval,
+    dailyAverage,
+    coverageDays,
+  };
+}
+
+async function loadStockAnalytics() {
+  const tbody = $("analysis-table-body");
+  tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">Calculando análisis…</td></tr>';
+
+  try {
+    const movements = await loadAllStockMovements();
+    const earliestMovement = movements[0];
+    $("analysis-start-date").textContent = earliestMovement
+      ? new Intl.DateTimeFormat("es-ES", { dateStyle: "long" }).format(new Date(earliestMovement.created_at))
+      : "—";
+
+    if (!allProducts.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">No hay suministros para analizar.</td></tr>';
+      return;
+    }
+
+    const now = new Date();
+    const rows = allProducts
+      .map((product) => buildProductConsumptionStats(product, movements, now))
+      .sort((a, b) => {
+        if (a.coverageDays === null) return b.coverageDays === null ? a.product.name.localeCompare(b.product.name) : 1;
+        if (b.coverageDays === null) return -1;
+        return a.coverageDays - b.coverageDays;
+      });
+
+    tbody.innerHTML = rows.map((stats) => `
+      <tr>
+        <td data-label="Suministro" class="movement-product-cell">${escapeHtml(stats.product.name)}</td>
+        <td data-label="Stock actual">${formatStockNumber(stats.product.quantity)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}</td>
+        <td data-label="Entradas">${formatStockNumber(stats.incoming)}</td>
+        <td data-label="Salidas">${formatStockNumber(stats.outgoing)}</td>
+        <td data-label="Agotamientos">${stats.exhaustionCount}</td>
+        <td data-label="Media entre agotamientos">${stats.averageExhaustionInterval === null ? "Aún sin media" : formatDurationDays(stats.averageExhaustionInterval)}</td>
+        <td data-label="Consumo diario medio">${stats.dailyAverage === null ? "Datos insuficientes" : `${formatStockNumber(stats.dailyAverage)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}/día`}</td>
+        <td data-label="Stock estimado" class="${stats.coverageDays !== null && stats.coverageDays < 7 ? "analysis-low-coverage" : ""}">${stats.coverageDays === null ? "Sin estimación" : formatDurationDays(stats.coverageDays)}</td>
+      </tr>
+    `).join("");
+  } catch (error) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">No se pudo cargar el análisis de consumo.</td></tr>';
+    showToast("Error al calcular el análisis: " + error.message);
+  }
+}
+
+populateHistoryProductFilter();
+$("history-product-filter").addEventListener("change", () => loadStockHistory(true));
+$("history-type-filter").addEventListener("change", () => loadStockHistory(true));
+$("history-load-more").addEventListener("click", () => loadStockHistory());
 
 function renderSuppliersTable() {
   const tbody = $("suppliers-table-body");
