@@ -9,6 +9,7 @@ let currentProfile = null;
 let allProducts = [];
 let allSuppliers = [];
 let activeCategoryFilter = '';
+let activeNamePrefixFilter = '';
 const LOW_STOCK_CATEGORY_KEY = '__low_stock__';
 const CATEGORY_ORDER_COOKIE = 'stock_impresion_category_order';
 let addScanner = null;
@@ -647,6 +648,25 @@ function populateDatalists() {
   renderCategoryPills();
 }
 
+function getCategoryNamePrefixes(category) {
+  const prefixes = new Map();
+  allProducts
+    .filter((product) => product.category === category)
+    .forEach((product) => {
+      const prefix = product.name.trim().split(/\s+/)[0];
+      if (!prefix) return;
+      const key = prefix.toLocaleLowerCase('es');
+      const existing = prefixes.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        prefixes.set(key, { label: prefix, count: 1 });
+      }
+    });
+
+  return [...prefixes.values()].sort((a, b) => a.label.localeCompare(b.label, 'es'));
+}
+
 function renderCategoryPills() {
   if (!Array.isArray(allProducts)) return;
 
@@ -658,6 +678,12 @@ function renderCategoryPills() {
   const isMobile = window.innerWidth < 900;
   const totalCount = allProducts.length;
   const lowStockCount = allProducts.filter(isLowStock).length;
+  const namePrefixes = activeCategoryFilter && activeCategoryFilter !== LOW_STOCK_CATEGORY_KEY
+    ? getCategoryNamePrefixes(activeCategoryFilter)
+    : [];
+  if (!namePrefixes.some((prefix) => prefix.label.toLocaleLowerCase('es') === activeNamePrefixFilter)) {
+    activeNamePrefixFilter = '';
+  }
 
   if (!container.parentElement) return;
 
@@ -667,6 +693,7 @@ function renderCategoryPills() {
       { label: 'Todos', value: '', className: 'mobile-category-quick' },
       { label: 'Poco stock', value: LOW_STOCK_CATEGORY_KEY, className: 'mobile-category-quick low-stock' },
     ];
+    const categoryCount = allProducts.filter((product) => product.category === activeCategoryFilter).length;
 
     container.innerHTML = `
       <div class="mobile-category-quick-row">
@@ -686,11 +713,22 @@ function renderCategoryPills() {
           }).join('')}
         </select>
       </label>
+      ${namePrefixes.length ? `
+        <div class="name-prefix-filters">
+          <button type="button" class="name-prefix-pill${activeNamePrefixFilter ? '' : ' active'}" data-prefix="">Todos <span class="count">${categoryCount}</span></button>
+          ${namePrefixes.map((prefix) => `
+            <button type="button" class="name-prefix-pill${activeNamePrefixFilter === prefix.label.toLocaleLowerCase('es') ? ' active' : ''}" data-prefix="${escapeHtml(prefix.label.toLocaleLowerCase('es'))}">
+              ${escapeHtml(prefix.label)} <span class="count">${prefix.count}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
     `;
 
     container.querySelectorAll('.mobile-category-quick').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeCategoryFilter = btn.dataset.filter || '';
+        activeNamePrefixFilter = '';
         renderCategoryPills();
         renderProductList();
       });
@@ -701,15 +739,22 @@ function renderCategoryPills() {
       select.addEventListener('change', () => {
         const value = select.value;
         activeCategoryFilter = value;
+        activeNamePrefixFilter = '';
         renderCategoryPills();
         renderProductList();
       });
     }
+    container.querySelectorAll('.name-prefix-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeNamePrefixFilter = btn.dataset.prefix || '';
+        renderCategoryPills();
+        renderProductList();
+      });
+    });
     return;
   }
 
-  container.innerHTML = items
-    .map((c) => {
+  const categoryPills = items.map((c) => {
       const value = c === 'Todos' ? '' : c === 'Poco stock' ? LOW_STOCK_CATEGORY_KEY : c;
       const active = (c === 'Todos' ? activeCategoryFilter === '' : activeCategoryFilter === value);
       const count = c === 'Poco stock'
@@ -718,8 +763,19 @@ function renderCategoryPills() {
           ? totalCount
           : allProducts.filter((p) => p.category === c).length;
       return `<button type="button" class="pill ${active ? 'active' : ''}" data-cat="${escapeHtml(value)}" title="${escapeHtml(c)}">${escapeHtml(c)} <span class="count">${count}</span></button>`;
-    })
-    .join("");
+    }).join("");
+  const categoryCount = allProducts.filter((product) => product.category === activeCategoryFilter).length;
+  const prefixPills = namePrefixes.length ? `
+    <div class="name-prefix-filters">
+      <button type="button" class="name-prefix-pill${activeNamePrefixFilter ? '' : ' active'}" data-prefix="">Todos <span class="count">${categoryCount}</span></button>
+      ${namePrefixes.map((prefix) => `
+        <button type="button" class="name-prefix-pill${activeNamePrefixFilter === prefix.label.toLocaleLowerCase('es') ? ' active' : ''}" data-prefix="${escapeHtml(prefix.label.toLocaleLowerCase('es'))}">
+          ${escapeHtml(prefix.label)} <span class="count">${prefix.count}</span>
+        </button>
+      `).join('')}
+    </div>
+  ` : '';
+  container.innerHTML = `${categoryPills}${prefixPills}`;
 
   container.querySelectorAll('.pill').forEach((btn) => {
     const catValue = btn.dataset.cat;
@@ -728,6 +784,7 @@ function renderCategoryPills() {
 
     btn.addEventListener('click', () => {
       activeCategoryFilter = catValue;
+      activeNamePrefixFilter = '';
       renderCategoryPills();
       renderProductList();
     });
@@ -761,6 +818,13 @@ function renderCategoryPills() {
         renderProductList();
       });
     }
+  });
+  container.querySelectorAll('.name-prefix-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeNamePrefixFilter = btn.dataset.prefix || '';
+      renderCategoryPills();
+      renderProductList();
+    });
   });
 }
 
@@ -798,12 +862,21 @@ function renderProductList() {
   } else if (activeCategoryFilter) {
     finalFiltered = filtered.filter((p) => p.category === activeCategoryFilter);
   }
+  if (activeNamePrefixFilter) {
+    finalFiltered = finalFiltered.filter((product) =>
+      product.name.trim().split(/\s+/)[0].toLocaleLowerCase('es') === activeNamePrefixFilter
+    );
+  }
 
   const container = $("product-list");
   $("list-empty").classList.toggle("hidden", allProducts.length > 0);
 
   if (filtered.length === 0 && allProducts.length > 0) {
     container.innerHTML = `<p style="color:var(--ink-soft);text-align:center;padding:30px 10px;">No hay ningún suministro que coincida con "${escapeHtml(term)}".</p>`;
+    return;
+  }
+  if (finalFiltered.length === 0 && allProducts.length > 0) {
+    container.innerHTML = '<p style="color:var(--ink-soft);text-align:center;padding:30px 10px;">No hay suministros que coincidan con los filtros seleccionados.</p>';
     return;
   }
 
