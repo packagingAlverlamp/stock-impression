@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
 
   const { data: productsData, error: productsError } = await supabase
     .from('products')
-    .select('name, quantity, min_quantity, unit');
+    .select('name, category, quantity, min_quantity, unit');
 
   if (productsError) {
     return res.status(500).json({ ok: false, message: productsError.message });
@@ -68,7 +68,7 @@ module.exports = async (req, res) => {
       : 'No hay suministros por debajo del mínimo esta semana.',
     '',
     ...lowStockProducts.map((product) =>
-      `- ${product.name}: stock ${product.quantity} / mínimo ${product.min_quantity}${product.unit ? ` (${product.unit})` : ''}`
+      `- ${product.name} (categoría / máquina: ${product.category || 'Sin categoría'}): stock ${product.quantity} / mínimo ${product.min_quantity}${product.unit ? ` (${product.unit})` : ''}`
     ),
     '',
     'Reponlos cuando puedas.',

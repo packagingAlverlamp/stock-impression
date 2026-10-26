@@ -1353,6 +1353,7 @@ async function checkLowStock(product) {
 
 function buildLowStockEmailHtml(product) {
   const unit = product.unit || "uds";
+  const category = product.category || "Sin categoría";
   const supplier = product.supplier;
   const supplierName = supplier?.name || "Sin proveedor";
   const supplierEmails = (supplier?.email || "")
@@ -1373,6 +1374,7 @@ function buildLowStockEmailHtml(product) {
         <div style="font-size: 16px; line-height: 1.6; color: #374151; margin-bottom: 18px;">
           El suministro <strong>${escapeHtml(product.name)}</strong> tiene <strong>${product.quantity}</strong> ${escapeHtml(unit)} y ha llegado al mínimo definido de <strong>${product.min_quantity}</strong>.
         </div>
+        <div style="margin-bottom: 18px; color: #374151;"><strong>Categoría / máquina:</strong> ${escapeHtml(category)}</div>
         <div style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; color: #374151;">
           <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 8px;">Proveedor</div>
           <div style="font-weight: 700; margin-bottom: 4px;">${escapeHtml(supplierName)}</div>
@@ -1409,9 +1411,11 @@ async function sendLowStockEmail(product) {
       .map((email) => email.trim())
       .filter(Boolean);
     const supplierSummary = [supplier?.name, supplierEmails.length ? supplierEmails.join("; ") : supplier?.email, supplier?.phone].filter(Boolean).join(" • ") || "Sin proveedor";
+    const category = product.category || "Sin categoría";
     const subject = `Stock bajo: ${product.name}`;
     const message = [
       `El suministro \"${product.name}\" está por debajo del mínimo.`,
+      `- Categoría / máquina: ${category}`,
       `- Stock actual: ${product.quantity}`,
       `- Mínimo: ${product.min_quantity}`,
       `- Unidad: ${product.unit || "unidades"}`,
@@ -1432,6 +1436,7 @@ async function sendLowStockEmail(product) {
           product_name: product.name,
           quantity: product.quantity,
           min_quantity: product.min_quantity,
+          category,
           supplier_name: supplier?.name || "Sin proveedor",
           supplier_email: supplier?.email || "",
           supplier_phone: supplier?.phone || "",

@@ -173,7 +173,7 @@ Alternativa sin servidor: EmailJS (recomendado si no quieres gestionar API keys)
 
 - EmailJS permite enviar emails directamente desde el frontend sin servidor.
   1. Regístrate en https://www.emailjs.com y crea un `Service` y una `Template`.
-  2. En la plantilla, añade variables: `to_email`, `subject`, `message`, `product_name`, `quantity`, `min_quantity`.
+  2. En la plantilla, añade variables: `to_email`, `subject`, `message`, `product_name`, `quantity`, `min_quantity`, `category`. La categoría también se muestra en el texto del email como categoría / máquina.
   3. En Vercel (Project → Settings → Environment Variables) añade:
      - `EMAILJS_SERVICE_ID` — el ID de tu Service (ej. `service_xxx`) (Config)
      - `EMAILJS_TEMPLATE_ID` — el ID de la plantilla (ej. `template_xxx`) (Config)
