@@ -98,6 +98,9 @@ en el servidor y no solo en el formulario.
 - Migración `20261030120000_service_request_history_and_photos.sql` aplicada
   en Supabase remoto.
 - `npm run check` y `npm run build` pasan correctamente.
+- Commit `f31b74d` subido a `origin/main` y desplegado en Vercel.
+- Verificado en producción: la web carga sin errores de consola y el menú de
+  escritorio muestra las secciones Principal, Herramientas y Cuenta.
 
 ### Pendiente
 
@@ -121,7 +124,9 @@ en el servidor y no solo en el formulario.
 1. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
    comprobar que el enlace devuelve a la web con la sesión iniciada.
 2. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
-3. Crear y aplicar una migración posterior para eliminar `products.category`
+3. Probar una solicitud de servicio técnico completa con fotos desde una
+   cuenta real y revisar el correo recibido.
+4. Crear y aplicar una migración posterior para eliminar `products.category`
    cuando la versión nueva lleve un tiempo publicada.
 
 ## Ficheros relevantes
@@ -161,7 +166,9 @@ en el servidor y no solo en el formulario.
 - No quedan migraciones pendientes en remoto.
 - URL de producción: `https://stock-impresion.vercel.app`.
 - La configuración de producción usa `APPS_SCRIPT_URL=""` y EmailJS. El
-  endpoint SendGrid no lo usa actualmente la app.
+  endpoint SendGrid no lo usa actualmente la app. Por eso las fotos se envían
+  como enlaces firmados dentro del mensaje; para adjuntarlas de verdad con
+  EmailJS hay que configurar adjuntos variables en la plantilla.
 - **Confirmación de email activada**: la configuración remota devuelve
   `mailer_autoconfirm: false`. Al registrarse, Supabase envía un correo y la
   cuenta no tiene acceso hasta confirmarlo.
