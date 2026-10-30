@@ -36,13 +36,19 @@ create policy "usuario_borra_su_propio_perfil"
   to authenticated
   using (auth.uid() = id);
 
--- Al registrarse alguien nuevo, se crea automáticamente su fila en profiles
+-- Al registrarse alguien nuevo, se crea automáticamente su fila en profiles.
+-- El registro queda limitado a emails corporativos @alverlamp.es.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
 begin
+  if new.email is null
+     or split_part(lower(trim(new.email)), '@', 2) <> 'alverlamp.es' then
+    raise exception 'Solo se permiten cuentas con email @alverlamp.es';
+  end if;
+
   insert into public.profiles (id, email)
   values (new.id, new.email);
   return new;
@@ -97,6 +103,86 @@ before update on public.suppliers
 for each row execute procedure public.set_supplier_updated_at();
 
 -- ------------------------------------------------------------
+-- TABLA: machines
+-- Máquinas de impresión con un proveedor asignado
+-- ------------------------------------------------------------
+create table public.machines (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  model text,
+  serial_number text,
+  supplier_id uuid references public.suppliers(id) on delete set null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.machines enable row level security;
+
+create unique index machines_name_unique_idx
+  on public.machines (lower(trim(name)))
+  where btrim(name) <> '';
+
+create policy "usuarios_ven_maquinaria"
+  on public.machines for select to authenticated using (true);
+
+create policy "usuarios_crean_maquinaria"
+  on public.machines for insert to authenticated with check (true);
+
+create policy "usuarios_editan_maquinaria"
+  on public.machines for update to authenticated using (true);
+
+create policy "usuarios_borran_maquinaria"
+  on public.machines for delete to authenticated using (true);
+
+create or replace function public.set_machine_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger machines_set_updated_at
+before update on public.machines
+for each row execute procedure public.set_machine_updated_at();
+
+-- ------------------------------------------------------------
+-- TABLA: maintenance_requests
+-- Historial de solicitudes de servicio técnico
+-- ------------------------------------------------------------
+create table public.maintenance_requests (
+  id uuid primary key default gen_random_uuid(),
+  machine_id uuid not null references public.machines(id) on delete restrict,
+  machine_name text not null,
+  machine_model text,
+  machine_serial_number text,
+  supplier_name text,
+  supplier_email text,
+  supplier_phone text,
+  reason text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'in_progress', 'resolved')),
+  notification_sent boolean not null default false,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.maintenance_requests enable row level security;
+
+create policy "usuarios_ven_solicitudes_servicio"
+  on public.maintenance_requests for select to authenticated using (true);
+
+create policy "usuarios_crean_solicitudes_servicio"
+  on public.maintenance_requests for insert to authenticated with check (true);
+
+create policy "usuarios_editan_solicitudes_servicio"
+  on public.maintenance_requests for update to authenticated using (true);
+
+create policy "usuarios_borran_solicitudes_servicio"
+  on public.maintenance_requests for delete to authenticated using (true);
+
+-- ------------------------------------------------------------
 -- TABLA: products
 -- Inventario compartido de suministros
 -- ------------------------------------------------------------
@@ -104,7 +190,7 @@ create table public.products (
   id uuid primary key default gen_random_uuid(),
   ean text unique,
   name text not null,
-  category text,
+  machine_id uuid references public.machines(id) on delete restrict,
   location text,
   supplier_id uuid references public.suppliers(id) on delete set null,
   unit text,
@@ -148,8 +234,11 @@ for each row execute procedure public.set_updated_at();
 -- Índices útiles
 -- ------------------------------------------------------------
 create index products_supplier_id_idx on public.products (supplier_id);
+create index products_machine_id_idx on public.products (machine_id);
 create index products_name_idx on public.products (name);
 create index products_ean_idx on public.products (ean);
+create index maintenance_requests_machine_created_at_idx
+  on public.maintenance_requests (machine_id, created_at desc);
 
 -- Supplier assignments are stored only through supplier_id.
 
@@ -193,12 +282,16 @@ declare
   movement_kind text;
   current_user_id uuid;
   current_user_email text;
+  current_machine_name text;
 begin
   current_user_id := auth.uid();
   current_user_email := coalesce(
     auth.jwt() ->> 'email',
     (select profiles.email from public.profiles where profiles.id = current_user_id)
   );
+  select machines.name into current_machine_name
+  from public.machines
+  where machines.id = new.machine_id;
 
   if tg_op = 'INSERT' then
     insert into public.stock_movements (
@@ -206,7 +299,7 @@ begin
       quantity_before, quantity_after, quantity_delta, user_id, user_email
     )
     values (
-      new.id, new.name, new.category, new.unit, 'initial',
+      new.id, new.name, current_machine_name, new.unit, 'initial',
       0, new.quantity, new.quantity, current_user_id, current_user_email
     );
     return new;
@@ -221,7 +314,7 @@ begin
       quantity_before, quantity_after, quantity_delta, user_id, user_email
     )
     values (
-      new.id, new.name, new.category, new.unit, movement_kind,
+      new.id, new.name, current_machine_name, new.unit, movement_kind,
       old.quantity, new.quantity, movement_delta, current_user_id, current_user_email
     );
   end if;

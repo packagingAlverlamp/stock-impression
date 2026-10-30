@@ -8,6 +8,8 @@ let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
 let allSuppliers = [];
+let allMachines = [];
+let allServiceRequests = [];
 let historyOffset = 0;
 let historyTotal = 0;
 let historyRows = [];
@@ -98,7 +100,8 @@ function escapeHtml(str) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function isLowStock(p) {
@@ -217,11 +220,21 @@ $("form-register").addEventListener("submit", async (e) => {
   $("auth-error").classList.add("hidden");
   const email = $("register-email").value.trim();
   const password = $("register-password").value;
-  const { error } = await supabaseClient.auth.signUp({ email, password });
+
+  if (!/^[^\s@]+@alverlamp\.es$/i.test(email)) {
+    showAuthError("Solo se permiten cuentas con email @alverlamp.es.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
   if (error) {
     showAuthError("No se ha podido crear la cuenta: " + error.message);
-  } else {
+  } else if (data?.session) {
     showToast("Cuenta creada. Ya has iniciado sesión.");
+  } else {
+    showToast("Cuenta creada. Revisa tu email para confirmarla antes de entrar.", 6000);
+    showLoginForms();
+    $("login-email").value = email;
   }
 });
 
@@ -262,6 +275,7 @@ async function enterApp() {
   $("app").classList.remove("hidden");
   await loadProfile();
   await loadSuppliers();
+  await loadMachines();
   await loadProducts();
   safeRenderInventoryState();
   showView("list");
@@ -274,7 +288,7 @@ async function enterApp() {
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "add", "scan", "suppliers", "analytics", "profile"];
+const VIEWS = ["list", "machines", "add", "scan", "suppliers", "analytics", "profile"];
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
@@ -297,6 +311,10 @@ function showView(name) {
   }
   if (name === "profile") renderProfile();
   if (name === "suppliers") loadSuppliers();
+  if (name === "machines") {
+    loadMachines();
+    loadServiceRequests();
+  }
   if (name === "analytics") showAnalyticsSection(activeAnalyticsSection);
   if (name === "list") {
     renderCategoryPills();
@@ -399,7 +417,7 @@ $("delete-account-btn").addEventListener("click", async () => {
     });
     const result = await res.json();
     if (result.success) {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       showToast("Cuenta eliminada");
     } else {
       showToast("Error al eliminar la cuenta: " + (result.error || ""));
@@ -448,6 +466,31 @@ function getSupplierOptionsHtml(selectedValue = "") {
   return options.join("");
 }
 
+function getMachineOptionsHtml(selectedValue = "") {
+  const options = [
+    '<option value="">Sin máquina</option>',
+    ...allMachines
+      .filter((machine) => machine.is_active || selectedValue === machine.id)
+      .map((machine) => `<option value="${escapeHtml(machine.id)}" ${selectedValue === machine.id ? "selected" : ""}>${escapeHtml(machine.name)}${machine.is_active ? "" : " (inactiva)"}</option>`),
+  ];
+
+  return options.join("");
+}
+
+function populateMachineSelects() {
+  ["add-machine", "edit-machine"].forEach((id) => {
+    const select = $(id);
+    if (!select) return;
+    const current = select.value || "";
+    select.innerHTML = getMachineOptionsHtml(current);
+    if (current && [...select.options].some((option) => option.value === current)) {
+      select.value = current;
+    } else {
+      select.value = "";
+    }
+  });
+}
+
 function populateSupplierSelects() {
   const addSelect = $("add-supplier");
   if (addSelect) {
@@ -473,8 +516,13 @@ function populateSupplierSelects() {
 }
 
 function normalizeProduct(product) {
-  const { supplier_info: supplier, ...values } = product;
-  return { ...values, supplier: supplier || null };
+  const { supplier_info: supplier, machine_info: machine, ...values } = product;
+  return {
+    ...values,
+    category: machine?.name || null,
+    supplier: supplier || null,
+    machine: machine || null,
+  };
 }
 
 function replaceProductInInventory(product) {
@@ -494,7 +542,7 @@ function replaceProductInInventory(product) {
 async function loadProducts() {
   const { data, error } = await supabaseClient
     .from("products")
-    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
     .order("name", { ascending: true });
   if (error) {
     showToast("Error al cargar el inventario");
@@ -889,6 +937,444 @@ function openSupplierModal(supplier = null) {
 }
 
 $("new-supplier-btn").addEventListener("click", () => openSupplierModal());
+
+async function loadMachines() {
+  const { data, error } = await supabaseClient
+    .from("machines")
+    .select("*, supplier_info:suppliers!machines_supplier_id_fkey(id, name, email, phone)")
+    .order("name", { ascending: true });
+
+  if (error) {
+    showToast("No se pudo cargar la maquinaria: " + error.message);
+    return;
+  }
+
+  allMachines = data || [];
+  populateMachineSelects();
+  renderMachines();
+}
+
+function renderMachines() {
+  const container = $("machines-list");
+  if (!container) return;
+
+  if (!allMachines.length) {
+    container.innerHTML = '<p class="empty-state">Todavía no hay máquinas. Añade la primera para asociarla a sus suministros.</p>';
+    return;
+  }
+
+  container.innerHTML = allMachines.map((machine) => {
+    const supplier = machine.supplier_info;
+    const details = [machine.model, machine.serial_number ? `N.º serie: ${machine.serial_number}` : ""].filter(Boolean);
+    const linkedProducts = allProducts.filter((product) => product.machine_id === machine.id).length;
+
+    return `
+      <article class="machine-card${machine.is_active ? "" : " inactive"}">
+        <div class="machine-card-main">
+          <div class="machine-card-heading">
+            <div>
+              <h3>${escapeHtml(machine.name)}</h3>
+              ${details.length ? `<p>${details.map(escapeHtml).join(" · ")}</p>` : ""}
+            </div>
+            ${machine.is_active ? "" : '<span class="machine-status">Inactiva</span>'}
+          </div>
+          <div class="machine-supplier">
+            <strong>Proveedor:</strong> ${escapeHtml(supplier?.name || "Pendiente de asignar")}
+            ${supplier?.email ? `<span>${escapeHtml(supplier.email)}</span>` : ""}
+            ${supplier?.phone ? `<span>${escapeHtml(supplier.phone)}</span>` : ""}
+          </div>
+          <div class="machine-meta">${linkedProducts} suministros asociados</div>
+        </div>
+        <div class="machine-actions">
+          ${machine.is_active && supplier ? `<button type="button" class="btn btn-teal machine-request-btn" data-machine-id="${machine.id}">Solicitar servicio técnico</button>` : ""}
+          ${machine.is_active && !supplier ? '<span class="machine-assignment-hint">Asigna un proveedor para solicitar servicio técnico.</span>' : ""}
+          <button type="button" class="btn btn-outline machine-edit-btn" data-machine-id="${machine.id}">Editar</button>
+          <button type="button" class="btn btn-outline machine-archive-btn" data-machine-id="${machine.id}">${machine.is_active ? "Eliminar" : "Reactivar"}</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".machine-edit-btn").forEach((button) => {
+    button.addEventListener("click", () => openMachineModal(allMachines.find((machine) => machine.id === button.dataset.machineId)));
+  });
+  container.querySelectorAll(".machine-request-btn").forEach((button) => {
+    button.addEventListener("click", () => openServiceRequestModal(allMachines.find((machine) => machine.id === button.dataset.machineId)));
+  });
+  container.querySelectorAll(".machine-archive-btn").forEach((button) => {
+    button.addEventListener("click", () => toggleMachineActive(allMachines.find((machine) => machine.id === button.dataset.machineId)));
+  });
+}
+
+function openMachineModal(machine = null) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet machine-modal">
+      <div class="modal-header">
+        <h2>${machine ? "Editar máquina" : "Nueva máquina"}</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <form id="machine-form">
+        <div class="field">
+          <label for="machine-name">Nombre *</label>
+          <input type="text" id="machine-name" required maxlength="120" value="${escapeHtml(machine?.name || "")}" placeholder="Ej: Roland" />
+        </div>
+        <div class="field">
+          <label for="machine-model">Marca / modelo</label>
+          <input type="text" id="machine-model" maxlength="160" value="${escapeHtml(machine?.model || "")}" placeholder="Ej: TrueVIS VG3-640" />
+        </div>
+        <div class="field">
+          <label for="machine-serial">Número de serie</label>
+          <input type="text" id="machine-serial" maxlength="120" value="${escapeHtml(machine?.serial_number || "")}" />
+        </div>
+        <div class="field">
+          <label for="machine-supplier">Proveedor asignado *</label>
+          <select id="machine-supplier" required>
+            <option value="">Selecciona un proveedor</option>
+            ${allSuppliers.filter((supplier) => supplier.name).map((supplier) => `<option value="${escapeHtml(supplier.id)}" ${machine?.supplier_id === supplier.id ? "selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
+          </select>
+          ${!allSuppliers.some((supplier) => supplier.name) ? '<small>Añade primero un proveedor en la sección Proveedores.</small>' : ""}
+        </div>
+        <button type="submit" class="btn btn-primary">${machine ? "Guardar cambios" : "Guardar máquina"}</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  backdrop.querySelector("#machine-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      name: backdrop.querySelector("#machine-name").value.trim(),
+      model: backdrop.querySelector("#machine-model").value.trim() || null,
+      serial_number: backdrop.querySelector("#machine-serial").value.trim() || null,
+      supplier_id: backdrop.querySelector("#machine-supplier").value,
+    };
+    if (!payload.supplier_id) {
+      showToast("Asigna un proveedor a la máquina.");
+      return;
+    }
+
+    try {
+      const query = machine
+        ? supabaseClient.from("machines").update(payload).eq("id", machine.id)
+        : supabaseClient.from("machines").insert(payload);
+      const { error } = await query;
+      if (error) throw error;
+
+      close();
+      await loadMachines();
+      await loadProducts();
+      showToast(machine ? "Máquina actualizada" : "Máquina guardada");
+    } catch (error) {
+      showToast("No se pudo guardar la máquina: " + error.message);
+    }
+  });
+}
+
+async function toggleMachineActive(machine) {
+  if (!machine) return;
+  if (!machine.is_active) {
+    const { error } = await supabaseClient.from("machines").update({ is_active: true }).eq("id", machine.id);
+    if (error) {
+      showToast("No se pudo reactivar la máquina: " + error.message);
+      return;
+    }
+    await loadMachines();
+    showToast("Máquina reactivada");
+    return;
+  }
+
+  const hasProducts = allProducts.some((product) => product.machine_id === machine.id);
+  const { count: requestCount, error: requestCountError } = await supabaseClient
+    .from("maintenance_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("machine_id", machine.id);
+  if (requestCountError) {
+    showToast("No se pudo comprobar el historial de la máquina: " + requestCountError.message);
+    return;
+  }
+  const hasRequests = requestCount > 0;
+  const action = hasProducts || hasRequests ? "archivarse como inactiva" : "eliminarse";
+  if (!confirm(`¿Quieres que "${machine.name}" ${action}?${hasProducts || hasRequests ? " Se conservarán sus suministros e historial." : ""}`)) return;
+
+  const { error } = hasProducts || hasRequests
+    ? await supabaseClient.from("machines").update({ is_active: false }).eq("id", machine.id)
+    : await supabaseClient.from("machines").delete().eq("id", machine.id);
+  if (error) {
+    showToast("No se pudo eliminar la máquina: " + error.message);
+    return;
+  }
+
+  await loadMachines();
+  await loadProducts();
+  await loadServiceRequests();
+  showToast(hasProducts || hasRequests ? "Máquina archivada" : "Máquina eliminada");
+}
+
+async function loadServiceRequests() {
+  const { data, error } = await supabaseClient
+    .from("maintenance_requests")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) {
+    showToast("No se pudo cargar el historial de servicio técnico: " + error.message);
+    return;
+  }
+
+  allServiceRequests = data || [];
+  renderServiceRequests();
+}
+
+function renderServiceRequests() {
+  const container = $("service-requests-list");
+  if (!container) return;
+  if (!allServiceRequests.length) {
+    container.innerHTML = '<p class="empty-state">Todavía no hay solicitudes de servicio técnico.</p>';
+    return;
+  }
+
+  const statuses = [
+    ["pending", "Pendiente"],
+    ["in_progress", "En curso"],
+    ["resolved", "Resuelta"],
+  ];
+  container.innerHTML = allServiceRequests.map((request) => `
+    <article class="service-request-card">
+      <div class="service-request-heading">
+        <div>
+          <h3>${escapeHtml(request.machine_name)}</h3>
+          <time>${escapeHtml(new Date(request.created_at).toLocaleString("es-ES"))}</time>
+        </div>
+        <label class="service-status-control">
+          <span>Estado</span>
+          <select class="service-status-select" data-request-id="${request.id}" aria-label="Estado de solicitud para ${escapeHtml(request.machine_name)}">
+            ${statuses.map(([value, label]) => `<option value="${value}" ${request.status === value ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <p class="service-request-reason">${escapeHtml(request.reason)}</p>
+      <p class="service-request-provider"><strong>Proveedor:</strong> ${escapeHtml(request.supplier_name || "Sin proveedor")}
+        ${request.supplier_email ? ` · ${escapeHtml(request.supplier_email)}` : ""}
+        ${request.supplier_phone ? ` · ${escapeHtml(request.supplier_phone)}` : ""}
+      </p>
+      <div class="service-request-footer">
+        <span class="${request.notification_sent ? "email-sent" : "email-pending"}">${request.notification_sent ? "Aviso enviado al equipo" : "Aviso pendiente de envío"}</span>
+        ${request.notification_sent ? "" : `<button type="button" class="btn btn-outline service-retry-btn" data-request-id="${request.id}">Reintentar envío</button>`}
+      </div>
+    </article>
+  `).join("");
+
+  container.querySelectorAll(".service-status-select").forEach((select) => {
+    select.addEventListener("change", () => updateServiceRequestStatus(select.dataset.requestId, select.value));
+  });
+  container.querySelectorAll(".service-retry-btn").forEach((button) => {
+    button.addEventListener("click", () => retryServiceRequestEmail(button.dataset.requestId));
+  });
+}
+
+async function updateServiceRequestStatus(requestId, status) {
+  const { error } = await supabaseClient
+    .from("maintenance_requests")
+    .update({ status })
+    .eq("id", requestId);
+  if (error) {
+    showToast("No se pudo actualizar el estado: " + error.message);
+    await loadServiceRequests();
+    return;
+  }
+  allServiceRequests = allServiceRequests.map((request) => request.id === requestId ? { ...request, status } : request);
+  showToast("Estado actualizado");
+}
+
+function openServiceRequestModal(machine) {
+  if (!machine?.supplier_info) {
+    showToast("Asigna un proveedor a la máquina antes de solicitar servicio técnico.");
+    return;
+  }
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet machine-modal">
+      <div class="modal-header">
+        <h2>Solicitar servicio técnico</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <p class="service-modal-machine">${escapeHtml(machine.name)}${machine.model ? ` · ${escapeHtml(machine.model)}` : ""}</p>
+      <p class="service-modal-provider">Proveedor: ${escapeHtml(machine.supplier_info.name || "Sin nombre")}</p>
+      <form id="service-request-form">
+        <div class="field">
+          <label for="service-request-reason">Motivo de la solicitud *</label>
+          <textarea id="service-request-reason" required maxlength="2000" rows="5" placeholder="Describe el problema o servicio que necesitas"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Enviar solicitud</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  backdrop.querySelector("#service-request-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const reason = backdrop.querySelector("#service-request-reason").value.trim();
+    if (!reason) {
+      showToast("Escribe el motivo de la solicitud.");
+      return;
+    }
+
+    const supplier = machine.supplier_info;
+    const request = {
+      machine_id: machine.id,
+      machine_name: machine.name,
+      machine_model: machine.model,
+      machine_serial_number: machine.serial_number,
+      supplier_name: supplier.name,
+      supplier_email: supplier.email,
+      supplier_phone: supplier.phone,
+      reason,
+      created_by: currentUser?.id || null,
+    };
+
+    const submitButton = backdrop.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = "Guardando solicitud…";
+    const { data, error } = await supabaseClient
+      .from("maintenance_requests")
+      .insert(request)
+      .select("*")
+      .single();
+    if (error) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Enviar solicitud";
+      showToast("No se pudo guardar la solicitud: " + error.message);
+      return;
+    }
+
+    close();
+    await loadServiceRequests();
+    try {
+      await sendServiceRequestEmail(data);
+      const { error: updateError } = await supabaseClient
+        .from("maintenance_requests")
+        .update({ notification_sent: true })
+        .eq("id", data.id);
+      if (updateError) throw new Error(`El email se envió, pero no se pudo actualizar el historial: ${updateError.message}`);
+      showToast("Solicitud guardada y aviso enviado al equipo");
+    } catch (error) {
+      showToast(`La solicitud quedó guardada, pero no se pudo enviar el aviso: ${error.message}`, 6000);
+    }
+    await loadServiceRequests();
+  });
+}
+
+function buildServiceRequestEmailHtml(request) {
+  return `
+    <div style="font-family:Arial,sans-serif;color:#1e1e1e;max-width:640px;margin:0 auto;background:#f7f7f7;padding:24px;border-radius:12px">
+      <div style="background:#111827;color:#fff;border-radius:10px 10px 0 0;padding:18px 20px">
+        <div style="font-size:22px;font-weight:700">Stock Impresión</div>
+        <div style="font-size:12px;margin-top:6px">Solicitud de servicio técnico</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:22px 20px;border-radius:0 0 10px 10px">
+        <h2>Solicitud de servicio técnico para ${escapeHtml(request.machine_name)}</h2>
+        ${request.machine_model ? `<p>Modelo: ${escapeHtml(request.machine_model)}</p>` : ""}
+        ${request.machine_serial_number ? `<p>Número de serie: ${escapeHtml(request.machine_serial_number)}</p>` : ""}
+        <p><strong>Motivo:</strong><br>${escapeHtml(request.reason).replace(/\n/g, "<br>")}</p>
+        <p><strong>Contactar con ${escapeHtml(request.supplier_name || "el proveedor asignado")}</strong></p>
+        ${request.supplier_email ? `<p>Email: ${escapeHtml(request.supplier_email)}</p>` : ""}
+        ${request.supplier_phone ? `<p>Teléfono: ${escapeHtml(request.supplier_phone)}</p>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+async function sendServiceRequestEmail(request) {
+  const { data: profiles, error } = await supabaseClient
+    .from("profiles")
+    .select("email")
+    .eq("notify_low_stock", true);
+  if (error) throw new Error(`No se pudo obtener el equipo destinatario: ${error.message}`);
+
+  const emails = [...new Set((profiles || []).map((profile) => profile.email?.trim()).filter(Boolean))];
+  if (!emails.length) throw new Error("No hay destinatarios activos para los avisos de stock.");
+
+  const subject = `Solicitud de servicio técnico para ${request.machine_name}`;
+  const message = [
+    subject,
+    "",
+    request.machine_model ? `Modelo: ${request.machine_model}` : "",
+    request.machine_serial_number ? `Número de serie: ${request.machine_serial_number}` : "",
+    `Motivo: ${request.reason}`,
+    "",
+    `Contactar con ${request.supplier_name || "el proveedor asignado"}`,
+    request.supplier_email ? `Email: ${request.supplier_email}` : "",
+    request.supplier_phone ? `Teléfono: ${request.supplier_phone}` : "",
+  ].filter((line) => line !== "").join("\n");
+
+  const useEmailJS = typeof EMAILJS_SERVICE_ID !== "undefined" && EMAILJS_SERVICE_ID;
+  if (useEmailJS && window.emailjs && typeof window.emailjs.send === "function") {
+    await Promise.all(emails.map((email) => emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      {
+        to_email: email,
+        subject,
+        message,
+        machine_name: request.machine_name,
+        machine_model: request.machine_model || "",
+        machine_serial_number: request.machine_serial_number || "",
+        request_reason: request.reason,
+        supplier_name: request.supplier_name || "",
+        supplier_email: request.supplier_email || "",
+        supplier_phone: request.supplier_phone || "",
+      },
+      EMAILJS_PUBLIC_KEY
+    )));
+    return;
+  }
+
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) {
+    throw new Error("No hay ningún servicio de email configurado.");
+  }
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emails, subject, text: message, html: buildServiceRequestEmailHtml(request) }),
+  });
+  const responseBody = await response.text();
+  if (!response.ok) throw new Error(responseBody || `El servicio de email respondió con HTTP ${response.status}.`);
+  if (response.headers.get("content-type")?.includes("application/json")) {
+    const result = JSON.parse(responseBody);
+    if (result.success === false) throw new Error(result.error || "El servicio de email no pudo enviar el mensaje.");
+  }
+}
+
+async function retryServiceRequestEmail(requestId) {
+  const request = allServiceRequests.find((item) => item.id === requestId);
+  if (!request) return;
+  try {
+    await sendServiceRequestEmail(request);
+    const { error } = await supabaseClient.from("maintenance_requests").update({ notification_sent: true }).eq("id", requestId);
+    if (error) throw new Error(`El email se envió, pero no se pudo actualizar el historial: ${error.message}`);
+    showToast("Aviso enviado al equipo");
+    await loadServiceRequests();
+  } catch (error) {
+    showToast(`No se pudo enviar el aviso: ${error.message}`, 6000);
+  }
+}
+
+$("new-machine-btn").addEventListener("click", () => openMachineModal());
 
 function updateLowStockBadge() {
   const lowCount = allProducts.filter(isLowStock).length;
@@ -1302,7 +1788,15 @@ function adjustCategoryWidths() {
   });
 }
 
+let lastDesktopLayout = window.innerWidth >= 900;
+
 window.addEventListener('resize', () => {
+  const isDesktop = window.innerWidth >= 900;
+  if (isDesktop !== lastDesktopLayout) {
+    lastDesktopLayout = isDesktop;
+    renderCategoryPills();
+    renderProductList();
+  }
   // re-evaluate after resize
   setTimeout(adjustCategoryWidths, 120);
 });
@@ -1311,7 +1805,14 @@ window.addEventListener('resize', () => {
 // Stock: actualización de cantidades + avisos de stock bajo
 // ---------------------------------------------------------------
 async function applyQuantityDelta(product, delta) {
-  const newQty = Math.max(0, Number(product.quantity) + delta);
+  const currentQty = Number(product.quantity) || 0;
+  const newQty = Math.max(0, currentQty + delta);
+
+  if (newQty === currentQty) {
+    showToast(delta < 0 ? "No queda stock para sacar" : "La cantidad no ha cambiado");
+    return null;
+  }
+
   return updateProductQuantity(product.id, newQty);
 }
 
@@ -1320,7 +1821,7 @@ async function updateProductQuantity(productId, newQty) {
     .from("products")
     .update({ quantity: newQty })
     .eq("id", productId)
-    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
     .single();
   if (error) {
     showToast("Error al actualizar la cantidad");
@@ -1374,7 +1875,7 @@ function buildLowStockEmailHtml(product) {
         <div style="font-size: 16px; line-height: 1.6; color: #374151; margin-bottom: 18px;">
           El suministro <strong>${escapeHtml(product.name)}</strong> tiene <strong>${product.quantity}</strong> ${escapeHtml(unit)} y ha llegado al mínimo definido de <strong>${product.min_quantity}</strong>.
         </div>
-        <div style="margin-bottom: 18px; color: #374151;"><strong>Categoría / máquina:</strong> ${escapeHtml(category)}</div>
+        <div style="margin-bottom: 18px; color: #374151;"><strong>Máquina:</strong> ${escapeHtml(category)}</div>
         <div style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; color: #374151;">
           <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 8px;">Proveedor</div>
           <div style="font-weight: 700; margin-bottom: 4px;">${escapeHtml(supplierName)}</div>
@@ -1415,7 +1916,7 @@ async function sendLowStockEmail(product) {
     const subject = `Stock bajo: ${product.name}`;
     const message = [
       `El suministro \"${product.name}\" está por debajo del mínimo.`,
-      `- Categoría / máquina: ${category}`,
+      `- Máquina: ${category}`,
       `- Stock actual: ${product.quantity}`,
       `- Mínimo: ${product.min_quantity}`,
       `- Unidad: ${product.unit || "unidades"}`,
@@ -1495,8 +1996,8 @@ function openEditModal(productId) {
         </div>
         <div class="two-col">
           <div class="field">
-            <label>Categoría</label>
-            <input type="text" id="edit-category" list="list-categories" value="${escapeHtml(p.category || "")}" />
+            <label>Máquina</label>
+            <select id="edit-machine">${getMachineOptionsHtml(p.machine_id || "")}</select>
           </div>
           <div class="field">
             <label>Formato</label>
@@ -1540,7 +2041,7 @@ function openEditModal(productId) {
     const updated = {
       ean: $("edit-ean").value.trim() || null,
       name: $("edit-name").value.trim(),
-      category: $("edit-category").value.trim() || null,
+      machine_id: $("edit-machine").value || null,
       unit: $("edit-unit").value.trim() || null,
       location: $("edit-location").value.trim() || null,
       supplier_id: $("edit-supplier").value || null,
@@ -1551,7 +2052,7 @@ function openEditModal(productId) {
       .from("products")
       .update(updated)
       .eq("id", p.id)
-      .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
+      .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
       .single();
     if (error) {
       showToast("Error al guardar: " + error.message);
@@ -1607,7 +2108,11 @@ function startAddScanner() {
       },
       () => {}
     )
-    .catch(() => showToast("No se pudo acceder a la cámara"));
+    .catch(() => {
+      addScanner = null;
+      $("add-scanner").classList.add("hidden");
+      showToast("No se pudo acceder a la cámara");
+    });
 }
 
 function stopAddScanner() {
@@ -1622,7 +2127,7 @@ $("form-add-product").addEventListener("submit", async (e) => {
   const payload = {
     ean: $("add-ean").value.trim() || null,
     name: $("add-name").value.trim(),
-    category: $("add-category").value.trim() || null,
+    machine_id: $("add-machine").value || null,
     unit: $("add-unit").value.trim() || null,
     location: $("add-location").value.trim() || null,
     supplier_id: $("add-supplier").value || null,
@@ -1633,7 +2138,7 @@ $("form-add-product").addEventListener("submit", async (e) => {
   const { data, error } = await supabaseClient
     .from("products")
     .insert(payload)
-    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone)")
+    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
     .single();
   if (error) {
     if (error.message.includes("duplicate")) {
@@ -1690,7 +2195,11 @@ function startStockScanner() {
       (decodedText) => onStockScan(decodedText),
       () => {}
     )
-    .catch(() => showToast("No se pudo acceder a la cámara"));
+    .catch(() => {
+      stockScanner = null;
+      setScanCameraVisible(false);
+      showToast("No se pudo acceder a la cámara");
+    });
 }
 
 function stopStockScanner() {
@@ -1757,8 +2266,8 @@ async function onStockScan(ean) {
   $("scan-confirm").addEventListener("click", async () => {
     const amount = Number($("scan-delta").value) || 1;
     const delta = stockScanMode === "out" ? -amount : amount;
-    await applyQuantityDelta(product, delta);
-    showToast(`${label}: ${amount} × ${product.name}`);
+    const updated = await applyQuantityDelta(product, delta);
+    if (updated) showToast(`${label}: ${amount} × ${product.name}`);
     resumeScan();
   });
   $("scan-resume").addEventListener("click", resumeScan);

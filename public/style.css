@@ -162,6 +162,12 @@ a { color: var(--teal); }
   color: var(--ink-soft);
   margin-bottom: 6px;
 }
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
 .field input, .field select {
   width: 100%;
   padding: 12px 13px;
@@ -817,7 +823,198 @@ h2.section-title {
   padding: 22px 14px;
 }
 
+.machines-list,
+.service-requests-list {
+  display: grid;
+  gap: 12px;
+  width: min(900px, 100%);
+}
+
+.machine-card,
+.service-request-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.machine-card.inactive {
+  background: rgba(17, 24, 39, 0.035);
+}
+
+.machine-card-heading,
+.service-request-heading,
+.service-request-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.machine-card-heading h3,
+.service-request-heading h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.machine-card-heading p,
+.service-request-heading time {
+  display: block;
+  margin: 5px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.machine-status {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.machine-supplier {
+  display: grid;
+  gap: 3px;
+  margin-top: 14px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.machine-meta {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.machine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.machine-actions .btn {
+  width: auto;
+  min-height: 40px;
+  margin: 0;
+}
+
+.machine-assignment-hint,
+.service-modal-provider {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.service-history-section {
+  margin-top: 30px;
+}
+
+.service-request-reason {
+  margin: 16px 0 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.service-request-provider {
+  color: var(--ink-soft);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.service-status-control {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.service-status-control select {
+  width: auto;
+  min-width: 120px;
+  padding: 8px 28px 8px 10px;
+  font-size: 13px;
+}
+
+.service-request-footer {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.service-request-footer .btn {
+  width: auto;
+  min-height: 38px;
+  margin: 0;
+}
+
+.email-sent,
+.email-pending {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.email-sent { color: var(--green); }
+.email-pending { color: var(--red); }
+
+.service-modal-machine {
+  margin: 0 0 5px;
+  font-weight: 700;
+}
+
+.machine-modal textarea {
+  width: 100%;
+  resize: vertical;
+}
+
 @media (max-width: 600px) {
+  nav.tabbar {
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow-x: hidden;
+  }
+
+  nav.tabbar button {
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 3px;
+    padding-right: 1px;
+    padding-left: 1px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  nav.tabbar button span {
+    display: block;
+  }
+
+  nav.tabbar .nav-label-short { display: block; }
+  nav.tabbar .nav-label-full { display: none; }
+  nav.tabbar svg { width: 19px; height: 19px; }
+
+  #view-machines .section-header .section-title {
+    font-size: 18px;
+  }
+
+  #view-machines .section-header .btn {
+    min-width: 0;
+    padding-right: 10px;
+    padding-left: 10px;
+    white-space: nowrap;
+  }
+
+  .machine-card,
+  .service-request-card {
+    padding: 14px;
+  }
+
+  .machine-actions .machine-request-btn {
+    flex-basis: 100%;
+  }
+
   .history-filters {
     flex-direction: column;
     gap: 10px;
@@ -971,6 +1168,10 @@ h2.section-title {
   .supplier-table tbody .supplier-actions::before {
     content: none;
   }
+}
+
+@media (min-width: 601px) {
+  nav.tabbar .nav-label-short { display: none; }
 }
 
 .scan-inline-btn {

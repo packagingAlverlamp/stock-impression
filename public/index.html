@@ -14,27 +14,32 @@
   <nav class="tabbar">
     <button type="button" class="tab-btn active" data-view="list">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      Inventario
+      <span>Inventario</span>
+    </button>
+    <button type="button" class="tab-btn" data-view="machines" aria-label="Maquinaria">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v11H4zM8 8V5h8v3M8 13h8M8 16h4M2 11v5M22 11v5"/></svg>
+      <span>Máquinas</span>
     </button>
     <button type="button" class="tab-btn" data-view="add">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
-      Añadir
+      <span>Añadir</span>
     </button>
     <button type="button" class="tab-btn" data-view="scan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
-      Escanear
+      <span>Escanear</span>
     </button>
     <button type="button" class="tab-btn" data-view="suppliers">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
-      Proveedores
+      <span class="nav-label-full">Proveedores</span>
+      <span class="nav-label-short">Provee.</span>
     </button>
     <button type="button" class="tab-btn" data-view="analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-4 3 2 5-6"/></svg>
-      Análisis
+      <span>Análisis</span>
     </button>
     <button type="button" class="tab-btn" data-view="profile">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
-      Perfil
+      <span>Perfil</span>
     </button>
   </nav>
 
@@ -82,8 +87,9 @@
     <!-- Formulario de registro -->
     <form id="form-register" class="hidden">
       <div class="field">
-        <label for="register-email">Email</label>
-        <input type="email" id="register-email" required autocomplete="email" />
+        <label for="register-email">Email corporativo</label>
+        <input type="email" id="register-email" required autocomplete="email" placeholder="tu.nombre@alverlamp.es" />
+        <small class="field-hint">Solo se permiten cuentas @alverlamp.es</small>
       </div>
       <div class="field">
         <label for="register-password">Contraseña</label>
@@ -113,7 +119,7 @@
     <main id="view-list" class="view">
       <div class="search-row">
         <div class="search-input-wrap">
-          <input type="text" id="search-input" placeholder="Buscar por nombre, categoría, ubicación..." />
+          <input type="text" id="search-input" placeholder="Buscar por nombre, máquina, ubicación..." />
           <button type="button" id="clear-search" class="clear-search hidden" aria-label="Borrar búsqueda">×</button>
         </div>
         <div id="category-pills" class="category-pills" aria-hidden="false"></div>
@@ -146,9 +152,10 @@
         </div>
         <div class="two-col">
           <div class="field">
-            <label for="add-category">Categoría</label>
-            <input type="text" id="add-category" list="list-categories" placeholder="Ej: Papel" />
-            <datalist id="list-categories"></datalist>
+            <label for="add-machine">Máquina</label>
+            <select id="add-machine">
+              <option value="">Sin máquina</option>
+            </select>
           </div>
           <div class="field">
             <label for="add-unit">Formato</label>
@@ -218,6 +225,20 @@
           <tbody id="suppliers-table-body"></tbody>
         </table>
       </div>
+    </main>
+
+    <!-- ---------- Vista: Maquinaria ---------- -->
+    <main id="view-machines" class="view hidden">
+      <div class="section-header">
+        <h2 class="section-title">Maquinaria</h2>
+        <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>
+      </div>
+      <div id="machines-list" class="machines-list"></div>
+
+      <section class="service-history-section">
+        <h2 class="section-title">Solicitudes de servicio técnico</h2>
+        <div id="service-requests-list" class="service-requests-list"></div>
+      </section>
     </main>
 
     <!-- ---------- Vista: Análisis de consumo ---------- -->
@@ -303,7 +324,7 @@
         <div class="switch-row">
           <div>
             <span class="switch-title">Avisos de stock bajo</span>
-            <span class="switch-desc">Recibir un email cuando un suministro llegue al mínimo</span>
+            <span class="switch-desc">Recibir avisos de stock bajo y solicitudes de servicio técnico</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="notify-toggle" />
