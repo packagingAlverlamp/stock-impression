@@ -65,31 +65,33 @@ en el servidor y no solo en el formulario.
 - Migración de maquinaria aplicada en remoto. Se conserva
   `products.category` temporalmente para que la versión antigua siga
   funcionando durante el despliegue.
+- Commit `42a6cfe` subido a `origin/main` y desplegado en Vercel.
+- Verificado en producción: la web carga sin errores y el registro con un
+  dominio distinto sigue bloqueado.
 - Prueba de humo en navegador: la app carga sin errores de consola y el
   formulario de registro funciona.
 
 ### Pendiente
 
-- Hacer commit y push del código para que Vercel despliegue la versión nueva.
 - Tras confirmar el despliegue, eliminar `products.category` con una migración
   posterior.
+- Decidir si se configura SMTP antes de dar de alta empleados nuevos.
 - Probar el flujo completo de registro con confirmación por email y el enlace
   de vuelta a la web.
 
 ### Bloqueado
 
-- Sin bloqueos de migración. La migración de maquinaria ya está aplicada; solo
-  falta desplegar el frontend. No eliminar `products.category` hasta que la
-  versión nueva esté publicada.
+- Sin bloqueos de migración. La migración de maquinaria ya está aplicada y el
+  frontend desplegado. No eliminar `products.category` hasta que la versión
+  nueva lleve un tiempo publicada y no queden pestañas antiguas abiertas.
 
 ## Siguiente paso
 
-1. Hacer commit y push del código.
-2. Verificar que Vercel publica la versión nueva.
-3. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
+1. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
    comprobar que el enlace devuelve a la web con la sesión iniciada.
-4. Comprobar que un email de otro dominio sigue bloqueado.
-5. Crear y aplicar una migración posterior para eliminar `products.category`.
+2. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
+3. Crear y aplicar una migración posterior para eliminar `products.category`
+   cuando la versión nueva lleve un tiempo publicada.
 
 ## Ficheros relevantes
 
@@ -141,5 +143,6 @@ en el servidor y no solo en el formulario.
   auditoría como comentario.
 - No exponer valores privados de `.env.local`.
 - `public/` se genera pero está versionado; el build lo actualiza.
-- Todos los cambios de esta iteración están sin commitear salvo que el usuario
-  pida lo contrario.
+- El código de esta iteración está commiteado y subido a `origin/main`.
+- La memoria se actualiza después del despliegue; si hay cambios locales
+  posteriores, reflejarlos aquí.
