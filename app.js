@@ -10,6 +10,7 @@ let allProducts = [];
 let allSuppliers = [];
 let allMachines = [];
 let allServiceRequests = [];
+let allServiceRequestEvents = [];
 let historyOffset = 0;
 let historyTotal = 0;
 let historyRows = [];
@@ -17,6 +18,10 @@ let activeCategoryFilter = '';
 let activeNamePrefixFilter = '';
 const LOW_STOCK_CATEGORY_KEY = '__low_stock__';
 const CATEGORY_ORDER_COOKIE = 'stock_impresion_category_order';
+const SERVICE_PHOTO_BUCKET = "service-request-photos";
+const SERVICE_PHOTO_MAX_FILES = 6;
+const SERVICE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const SERVICE_PHOTO_MAX_DIMENSION = 1600;
 let addScanner = null;
 let stockScanner = null;
 let stockScanMode = "out"; // "out" = sacar stock, "in" = añadir stock
@@ -44,26 +49,6 @@ function showToast(msg, ms = 3200) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.add("hidden"), ms);
 }
-
-/* Enhance sidebar on desktop: add brand block and ensure scan is hidden */
-function enhanceSidebar() {
-  const nav = document.querySelector('nav.tabbar');
-  if (!nav) return;
-  const isDesktop = window.innerWidth >= 900;
-  const existing = nav.querySelector('.sidebar-brand');
-  if (isDesktop && !existing) {
-    const brand = document.createElement('div');
-    brand.className = 'sidebar-brand';
-    brand.innerHTML = `<div style="padding:16px 12px 8px;color:var(--paper)"><div style="font-weight:700;font-size:18px">Stock Impresión</div><div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px">Inventario</div></div>`;
-    nav.insertAdjacentElement('afterbegin', brand);
-  } else if (!isDesktop && existing) {
-    existing.remove();
-  }
-}
-
-window.addEventListener('resize', () => enhanceSidebar());
-// run once on load
-setTimeout(enhanceSidebar, 120);
 
 function getCategoryOrderCookie() {
   const match = document.cookie.match(new RegExp('(?:^|; )' + CATEGORY_ORDER_COOKIE + '=([^;]*)'));
@@ -289,19 +274,64 @@ async function enterApp() {
 // Navegación entre vistas
 // ---------------------------------------------------------------
 const VIEWS = ["list", "machines", "add", "scan", "suppliers", "analytics", "profile"];
+let lastView = "list";
 
-document.querySelectorAll(".tab-btn").forEach((btn) => {
+const MOBILE_NAV_VIEWS = new Set(["list", "machines", "scan"]);
+
+document.querySelectorAll(".tab-btn[data-view]").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
 });
 $("empty-add-btn").addEventListener("click", () => showView("add"));
+$("more-nav-btn").addEventListener("click", openMoreMenu);
+
+document.querySelectorAll(".workshop-tab").forEach((button) => {
+  button.addEventListener("click", () => showView(button.dataset.workshopView));
+});
+
+function isMobileNav() {
+  return window.innerWidth < 900;
+}
+
+function updateWorkshopTabs(name) {
+  document.querySelectorAll(".workshop-tab").forEach((button) => {
+    const active = button.dataset.workshopView === name;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+}
+
+function updateNavState(name) {
+  document.querySelectorAll(".tab-btn[data-view]").forEach((button) => {
+    let active = button.dataset.view === name;
+    if (isMobileNav() && button.dataset.view === "machines") {
+      active = name === "machines" || name === "suppliers";
+    }
+    button.classList.toggle("active", active);
+  });
+
+  const moreButton = $("more-nav-btn");
+  if (moreButton) {
+    moreButton.classList.toggle(
+      "active",
+      isMobileNav() && ["add", "analytics", "profile"].includes(name)
+    );
+  }
+
+  updateWorkshopTabs(name);
+  lastView = name;
+}
+
+window.addEventListener("resize", () => updateNavState(lastView));
 
 function showView(name) {
+  if (!VIEWS.includes(name)) name = "list";
   VIEWS.forEach((v) => {
     $("view-" + v).classList.toggle("hidden", v !== name);
   });
-  document.querySelectorAll(".tab-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.view === name);
-  });
+  updateNavState(name);
+
+  const view = $("view-" + name);
+  if (view) view.scrollTop = 0;
 
   if (name !== "add") stopAddScanner();
   if (name === "scan") {
@@ -324,6 +354,56 @@ function showView(name) {
     });
   }
 }
+
+function openMoreMenu() {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered more-menu-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet more-menu-sheet">
+      <div class="modal-header">
+        <h2>Más opciones</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="more-menu-grid">
+        <button type="button" class="more-menu-item" data-menu-view="add">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Añadir suministro</span>
+        </button>
+        <button type="button" class="more-menu-item" data-menu-view="suppliers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
+          <span>Proveedores</span>
+        </button>
+        <button type="button" class="more-menu-item" data-menu-view="analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-3 3 2 5-6"/></svg>
+          <span>Análisis</span>
+        </button>
+        <button type="button" class="more-menu-item" data-menu-view="profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+          <span>Perfil</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  $("more-nav-btn").classList.add("active");
+  const close = () => {
+    backdrop.remove();
+    updateNavState(lastView);
+  };
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  backdrop.querySelectorAll(".more-menu-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const view = button.dataset.menuView;
+      close();
+      showView(view);
+    });
+  });
+}
+
 
 let activeAnalyticsSection = "analytics";
 document.querySelectorAll(".analytics-view-btn").forEach((button) => {
@@ -1130,7 +1210,64 @@ async function loadServiceRequests() {
   }
 
   allServiceRequests = data || [];
+
+  const requestIds = allServiceRequests.map((request) => request.id);
+  allServiceRequestEvents = [];
+  if (requestIds.length) {
+    const { data: events, error: eventsError } = await supabaseClient
+      .from("maintenance_request_events")
+      .select("*")
+      .in("request_id", requestIds)
+      .order("created_at", { ascending: true });
+    if (eventsError) {
+      console.warn("No se pudo cargar el historial de estados:", eventsError);
+    } else {
+      allServiceRequestEvents = events || [];
+    }
+  }
+
+  const photoPaths = [...new Set(allServiceRequests.flatMap((request) => (
+    Array.isArray(request.photo_paths) ? request.photo_paths : []
+  )))];
+  const signedByPath = new Map();
+  if (photoPaths.length) {
+    const { data: signed, error: signedError } = await supabaseClient.storage
+      .from(SERVICE_PHOTO_BUCKET)
+      .createSignedUrls(photoPaths, 86400);
+    if (signedError) {
+      console.warn("No se pudieron firmar las fotos de servicio técnico:", signedError);
+    } else {
+      (signed || []).forEach((item) => {
+        if (item.signedUrl) signedByPath.set(item.path, item.signedUrl);
+      });
+    }
+  }
+
+  allServiceRequests = allServiceRequests.map((request) => ({
+    ...request,
+    photo_urls: (Array.isArray(request.photo_paths) ? request.photo_paths : [])
+      .map((path) => signedByPath.get(path))
+      .filter(Boolean),
+  }));
+
   renderServiceRequests();
+}
+
+const SERVICE_STATUS_LABELS = {
+  pending: "Pendiente",
+  in_progress: "En curso",
+  resolved: "Resuelta",
+};
+
+function serviceStatusLabel(status) {
+  return SERVICE_STATUS_LABELS[status] || status || "Sin estado";
+}
+
+function formatServiceDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("es-ES");
 }
 
 function renderServiceRequests() {
@@ -1141,36 +1278,71 @@ function renderServiceRequests() {
     return;
   }
 
-  const statuses = [
-    ["pending", "Pendiente"],
-    ["in_progress", "En curso"],
-    ["resolved", "Resuelta"],
-  ];
-  container.innerHTML = allServiceRequests.map((request) => `
-    <article class="service-request-card">
-      <div class="service-request-heading">
-        <div>
-          <h3>${escapeHtml(request.machine_name)}</h3>
-          <time>${escapeHtml(new Date(request.created_at).toLocaleString("es-ES"))}</time>
+  const statuses = Object.entries(SERVICE_STATUS_LABELS);
+  const eventsByRequest = allServiceRequestEvents.reduce((groups, event) => {
+    if (!groups[event.request_id]) groups[event.request_id] = [];
+    groups[event.request_id].push(event);
+    return groups;
+  }, {});
+
+  container.innerHTML = allServiceRequests.map((request) => {
+    const events = eventsByRequest[request.id] || [];
+    const photos = request.photo_urls || [];
+
+    return `
+      <article class="service-request-card">
+        <div class="service-request-heading">
+          <div>
+            <h3>${escapeHtml(request.machine_name)}</h3>
+            <time>${escapeHtml(formatServiceDate(request.created_at))}</time>
+          </div>
+          <label class="service-status-control">
+            <span>Estado</span>
+            <select class="service-status-select" data-request-id="${request.id}" aria-label="Estado de solicitud para ${escapeHtml(request.machine_name)}">
+              ${statuses.map(([value, label]) => `<option value="${value}" ${request.status === value ? "selected" : ""}>${label}</option>`).join("")}
+            </select>
+          </label>
         </div>
-        <label class="service-status-control">
-          <span>Estado</span>
-          <select class="service-status-select" data-request-id="${request.id}" aria-label="Estado de solicitud para ${escapeHtml(request.machine_name)}">
-            ${statuses.map(([value, label]) => `<option value="${value}" ${request.status === value ? "selected" : ""}>${label}</option>`).join("")}
-          </select>
-        </label>
-      </div>
-      <p class="service-request-reason">${escapeHtml(request.reason)}</p>
-      <p class="service-request-provider"><strong>Proveedor:</strong> ${escapeHtml(request.supplier_name || "Sin proveedor")}
-        ${request.supplier_email ? ` · ${escapeHtml(request.supplier_email)}` : ""}
-        ${request.supplier_phone ? ` · ${escapeHtml(request.supplier_phone)}` : ""}
-      </p>
-      <div class="service-request-footer">
-        <span class="${request.notification_sent ? "email-sent" : "email-pending"}">${request.notification_sent ? "Aviso enviado al equipo" : "Aviso pendiente de envío"}</span>
-        ${request.notification_sent ? "" : `<button type="button" class="btn btn-outline service-retry-btn" data-request-id="${request.id}">Reintentar envío</button>`}
-      </div>
-    </article>
-  `).join("");
+        <p class="service-request-reason">${escapeHtml(request.reason)}</p>
+        <p class="service-request-provider"><strong>Proveedor:</strong> ${escapeHtml(request.supplier_name || "Sin proveedor")}
+          ${request.supplier_email ? ` · ${escapeHtml(request.supplier_email)}` : ""}
+          ${request.supplier_phone ? ` · ${escapeHtml(request.supplier_phone)}` : ""}
+        </p>
+        ${photos.length ? `
+          <div class="service-request-photos">
+            ${photos.map((url, index) => `
+              <a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir foto ${index + 1}">
+                <img src="${escapeHtml(url)}" alt="Foto ${index + 1} de la solicitud" loading="lazy" />
+              </a>
+            `).join("")}
+          </div>
+        ` : ""}
+        <details class="service-request-history">
+          <summary>Historial de estados${events.length ? ` (${events.length})` : ""}</summary>
+          ${events.length ? `
+            <ol class="service-history-list">
+              ${events.map((event) => `
+                <li>
+                  <span class="service-history-status ${escapeHtml(event.status)}">${escapeHtml(serviceStatusLabel(event.status))}</span>
+                  <span class="service-history-meta">
+                    ${escapeHtml(formatServiceDate(event.created_at))}
+                    ${event.changed_by_email ? ` · ${escapeHtml(event.changed_by_email)}` : ""}
+                  </span>
+                  <span class="service-history-change">
+                    ${event.previous_status ? `Antes: ${escapeHtml(serviceStatusLabel(event.previous_status))}` : "Solicitud creada"}
+                  </span>
+                </li>
+              `).join("")}
+            </ol>
+          ` : '<p class="service-history-empty">Todavía no hay cambios registrados.</p>'}
+        </details>
+        <div class="service-request-footer">
+          <span class="${request.notification_sent ? "email-sent" : "email-pending"}">${request.notification_sent ? "Aviso enviado al equipo" : "Aviso pendiente de envío"}</span>
+          ${request.notification_sent ? "" : `<button type="button" class="btn btn-outline service-retry-btn" data-request-id="${request.id}">Reintentar envío</button>`}
+        </div>
+      </article>
+    `;
+  }).join("");
 
   container.querySelectorAll(".service-status-select").forEach((select) => {
     select.addEventListener("change", () => updateServiceRequestStatus(select.dataset.requestId, select.value));
@@ -1181,6 +1353,9 @@ function renderServiceRequests() {
 }
 
 async function updateServiceRequestStatus(requestId, status) {
+  const request = allServiceRequests.find((item) => item.id === requestId);
+  if (request?.status === status) return;
+
   const { error } = await supabaseClient
     .from("maintenance_requests")
     .update({ status })
@@ -1190,8 +1365,104 @@ async function updateServiceRequestStatus(requestId, status) {
     await loadServiceRequests();
     return;
   }
-  allServiceRequests = allServiceRequests.map((request) => request.id === requestId ? { ...request, status } : request);
+  await loadServiceRequests();
   showToast("Estado actualizado");
+}
+
+function newPhotoId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function loadImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Formato de imagen no compatible."));
+    };
+    image.src = url;
+  });
+}
+
+async function compressServicePhoto(file) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error(`"${file.name}" no es una imagen.`);
+  }
+  if (file.size > SERVICE_PHOTO_MAX_BYTES) {
+    throw new Error(`"${file.name}" supera los 5 MB.`);
+  }
+
+  try {
+    const image = typeof createImageBitmap === "function"
+      ? await createImageBitmap(file)
+      : await loadImageElement(file);
+    const width = image.width;
+    const height = image.height;
+    const scale = Math.min(1, SERVICE_PHOTO_MAX_DIMENSION / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    if (typeof image.close === "function") image.close();
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob) throw new Error("No se pudo convertir la imagen.");
+    return { blob, extension: "jpg", contentType: "image/jpeg" };
+  } catch (error) {
+    const extension = (file.name.split(".").pop() || "jpg")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "") || "jpg";
+    return { blob: file, extension, contentType: file.type || "image/jpeg" };
+  }
+}
+
+async function uploadServicePhotos(files) {
+  const paths = [];
+  const attachments = [];
+
+  try {
+    for (const file of files) {
+      const { blob, extension, contentType } = await compressServicePhoto(file);
+      const path = `${currentUser.id}/${newPhotoId()}.${extension}`;
+      const { error } = await supabaseClient.storage
+        .from(SERVICE_PHOTO_BUCKET)
+        .upload(path, blob, { contentType, upsert: false });
+      if (error) throw new Error(error.message);
+
+      paths.push(path);
+      attachments.push({ name: `foto-${paths.length}.${extension}`, blob });
+    }
+    return { paths, attachments };
+  } catch (error) {
+    if (paths.length) {
+      try {
+        await supabaseClient.storage.from(SERVICE_PHOTO_BUCKET).remove(paths);
+      } catch (cleanupError) {
+        console.warn("No se pudieron limpiar las fotos subidas:", cleanupError);
+      }
+    }
+    throw error;
+  }
+}
+
+async function createServicePhotoSignedUrls(paths, expiresIn = 604800) {
+  if (!Array.isArray(paths) || !paths.length) return [];
+  const { data, error } = await supabaseClient.storage
+    .from(SERVICE_PHOTO_BUCKET)
+    .createSignedUrls(paths, expiresIn);
+  if (error) {
+    console.warn("No se pudieron firmar las fotos:", error);
+    return [];
+  }
+  return (data || []).map((item) => item.signedUrl).filter(Boolean);
 }
 
 function openServiceRequestModal(machine) {
@@ -1200,6 +1471,7 @@ function openServiceRequestModal(machine) {
     return;
   }
 
+  const selectedPhotos = [];
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop centered";
   backdrop.innerHTML = `
@@ -1215,17 +1487,67 @@ function openServiceRequestModal(machine) {
           <label for="service-request-reason">Motivo de la solicitud *</label>
           <textarea id="service-request-reason" required maxlength="2000" rows="5" placeholder="Describe el problema o servicio que necesitas"></textarea>
         </div>
+        <div class="field">
+          <label for="service-request-photos">Fotos (opcional)</label>
+          <input type="file" id="service-request-photos" accept="image/*" multiple />
+          <small class="field-hint">Hasta ${SERVICE_PHOTO_MAX_FILES} fotos de 5 MB como máximo. Se reducirán antes de enviarlas.</small>
+          <div id="service-photo-preview" class="service-photo-preview"></div>
+        </div>
         <button type="submit" class="btn btn-primary">Enviar solicitud</button>
       </form>
     </div>
   `;
   document.body.appendChild(backdrop);
 
-  const close = () => backdrop.remove();
+  const photoInput = backdrop.querySelector("#service-request-photos");
+  const photoPreview = backdrop.querySelector("#service-photo-preview");
+
+  const renderPhotoPreview = () => {
+    photoPreview.innerHTML = selectedPhotos.map((photo, index) => `
+      <div class="service-photo-item">
+        <img src="${photo.previewUrl}" alt="Foto ${index + 1}" />
+        <button type="button" class="service-photo-remove" data-photo-index="${index}" aria-label="Quitar foto ${index + 1}">&times;</button>
+      </div>
+    `).join("");
+
+    photoPreview.querySelectorAll(".service-photo-remove").forEach((button) => {
+      button.addEventListener("click", () => {
+        const [removed] = selectedPhotos.splice(Number(button.dataset.photoIndex), 1);
+        if (removed) URL.revokeObjectURL(removed.previewUrl);
+        renderPhotoPreview();
+      });
+    });
+  };
+
+  photoInput.addEventListener("change", () => {
+    [...photoInput.files].forEach((file) => {
+      if (selectedPhotos.length >= SERVICE_PHOTO_MAX_FILES) {
+        showToast(`Puedes adjuntar como máximo ${SERVICE_PHOTO_MAX_FILES} fotos.`);
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        showToast(`"${file.name}" no es una imagen.`);
+        return;
+      }
+      if (file.size > SERVICE_PHOTO_MAX_BYTES) {
+        showToast(`"${file.name}" supera los 5 MB.`);
+        return;
+      }
+      selectedPhotos.push({ file, previewUrl: URL.createObjectURL(file) });
+    });
+    photoInput.value = "";
+    renderPhotoPreview();
+  });
+
+  const close = () => {
+    selectedPhotos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+    backdrop.remove();
+  };
   backdrop.querySelector(".modal-close").addEventListener("click", close);
   backdrop.addEventListener("click", (event) => {
     if (event.target === backdrop) close();
   });
+
   backdrop.querySelector("#service-request-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const reason = backdrop.querySelector("#service-request-reason").value.trim();
@@ -1235,51 +1557,73 @@ function openServiceRequestModal(machine) {
     }
 
     const supplier = machine.supplier_info;
-    const request = {
-      machine_id: machine.id,
-      machine_name: machine.name,
-      machine_model: machine.model,
-      machine_serial_number: machine.serial_number,
-      supplier_name: supplier.name,
-      supplier_email: supplier.email,
-      supplier_phone: supplier.phone,
-      reason,
-      created_by: currentUser?.id || null,
-    };
-
     const submitButton = backdrop.querySelector('[type="submit"]');
+    const originalButtonText = submitButton.textContent;
     submitButton.disabled = true;
-    submitButton.textContent = "Guardando solicitud…";
-    const { data, error } = await supabaseClient
-      .from("maintenance_requests")
-      .insert(request)
-      .select("*")
-      .single();
-    if (error) {
-      submitButton.disabled = false;
-      submitButton.textContent = "Enviar solicitud";
-      showToast("No se pudo guardar la solicitud: " + error.message);
-      return;
-    }
 
-    close();
-    await loadServiceRequests();
+    let uploaded = { paths: [], attachments: [] };
     try {
-      await sendServiceRequestEmail(data);
-      const { error: updateError } = await supabaseClient
+      if (selectedPhotos.length) {
+        submitButton.textContent = "Subiendo fotos…";
+        uploaded = await uploadServicePhotos(selectedPhotos.map((photo) => photo.file));
+      }
+
+      submitButton.textContent = "Guardando solicitud…";
+      const request = {
+        machine_id: machine.id,
+        machine_name: machine.name,
+        machine_model: machine.model,
+        machine_serial_number: machine.serial_number,
+        supplier_name: supplier.name,
+        supplier_email: supplier.email,
+        supplier_phone: supplier.phone,
+        reason,
+        photo_paths: uploaded.paths,
+        created_by: currentUser?.id || null,
+      };
+
+      const { data, error } = await supabaseClient
         .from("maintenance_requests")
-        .update({ notification_sent: true })
-        .eq("id", data.id);
-      if (updateError) throw new Error(`El email se envió, pero no se pudo actualizar el historial: ${updateError.message}`);
-      showToast("Solicitud guardada y aviso enviado al equipo");
+        .insert(request)
+        .select("*")
+        .single();
+      if (error) throw new Error(error.message);
+
+      close();
+      await loadServiceRequests();
+
+      try {
+        const photoUrls = await createServicePhotoSignedUrls(uploaded.paths);
+        await sendServiceRequestEmail(data, {
+          photoUrls,
+          photoAttachments: uploaded.attachments,
+        });
+        const { error: updateError } = await supabaseClient
+          .from("maintenance_requests")
+          .update({ notification_sent: true })
+          .eq("id", data.id);
+        if (updateError) throw new Error(`El email se envió, pero no se pudo actualizar el historial: ${updateError.message}`);
+        showToast("Solicitud guardada y aviso enviado al equipo");
+      } catch (error) {
+        showToast(`La solicitud quedó guardada, pero no se pudo enviar el aviso: ${error.message}`, 6000);
+      }
+      await loadServiceRequests();
     } catch (error) {
-      showToast(`La solicitud quedó guardada, pero no se pudo enviar el aviso: ${error.message}`, 6000);
+      if (uploaded.paths.length) {
+        try {
+          await supabaseClient.storage.from(SERVICE_PHOTO_BUCKET).remove(uploaded.paths);
+        } catch (cleanupError) {
+          console.warn("No se pudieron limpiar las fotos de la solicitud fallida:", cleanupError);
+        }
+      }
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+      showToast("No se pudo guardar la solicitud: " + error.message, 6000);
     }
-    await loadServiceRequests();
   });
 }
 
-function buildServiceRequestEmailHtml(request) {
+function buildServiceRequestEmailHtml(request, photoUrls = []) {
   return `
     <div style="font-family:Arial,sans-serif;color:#1e1e1e;max-width:640px;margin:0 auto;background:#f7f7f7;padding:24px;border-radius:12px">
       <div style="background:#111827;color:#fff;border-radius:10px 10px 0 0;padding:18px 20px">
@@ -1294,12 +1638,70 @@ function buildServiceRequestEmailHtml(request) {
         <p><strong>Contactar con ${escapeHtml(request.supplier_name || "el proveedor asignado")}</strong></p>
         ${request.supplier_email ? `<p>Email: ${escapeHtml(request.supplier_email)}</p>` : ""}
         ${request.supplier_phone ? `<p>Teléfono: ${escapeHtml(request.supplier_phone)}</p>` : ""}
+        ${photoUrls.length ? `
+          <p><strong>Fotos adjuntas:</strong></p>
+          <div>
+            ${photoUrls.map((url, index) => `
+              <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="display:inline-block;margin:0 8px 8px 0;text-decoration:none">
+                <img src="${escapeHtml(url)}" alt="Foto ${index + 1}" style="width:180px;height:auto;border:1px solid #e5e7eb;border-radius:8px" />
+              </a>
+            `).join("")}
+          </div>
+        ` : ""}
       </div>
     </div>
   `;
 }
 
-async function sendServiceRequestEmail(request) {
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer una foto."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function buildEmailAttachments(photoAttachments = [], photoUrls = []) {
+  const sources = Array.isArray(photoAttachments) ? [...photoAttachments] : [];
+
+  if (!sources.length && photoUrls.length) {
+    for (const [index, url] of photoUrls.entries()) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) continue;
+        const blob = await response.blob();
+        sources.push({ name: `foto-${index + 1}.jpg`, blob });
+      } catch (error) {
+        console.warn("No se pudo descargar una foto para adjuntarla:", error);
+      }
+    }
+  }
+
+  const attachments = [];
+  let totalBytes = 0;
+  for (const item of sources) {
+    if (!item?.blob) continue;
+    if (totalBytes + item.blob.size > 12 * 1024 * 1024) break;
+    const content = await blobToBase64(item.blob);
+    if (!content) continue;
+    totalBytes += item.blob.size;
+    attachments.push({
+      name: item.name || `foto-${attachments.length + 1}.jpg`,
+      content,
+      mimeType: item.blob.type || "image/jpeg",
+    });
+  }
+  return attachments;
+}
+
+async function sendServiceRequestEmail(request, options = {}) {
+  const photoUrls = options.photoUrls || [];
+  const photoAttachments = options.photoAttachments || [];
+
   const { data: profiles, error } = await supabaseClient
     .from("profiles")
     .select("email")
@@ -1310,6 +1712,10 @@ async function sendServiceRequestEmail(request) {
   if (!emails.length) throw new Error("No hay destinatarios activos para los avisos de stock.");
 
   const subject = `Solicitud de servicio técnico para ${request.machine_name}`;
+  const photosText = photoUrls.map((url, index) => `Foto ${index + 1}: ${url}`).join("\n");
+  const photosHtml = photoUrls.length
+    ? `<p><strong>Fotos:</strong></p>${photoUrls.map((url, index) => `<p><a href="${escapeHtml(url)}">Foto ${index + 1}</a></p>`).join("")}`
+    : "";
   const message = [
     subject,
     "",
@@ -1320,6 +1726,8 @@ async function sendServiceRequestEmail(request) {
     `Contactar con ${request.supplier_name || "el proveedor asignado"}`,
     request.supplier_email ? `Email: ${request.supplier_email}` : "",
     request.supplier_phone ? `Teléfono: ${request.supplier_phone}` : "",
+    photoUrls.length ? "Fotos:" : "",
+    photosText,
   ].filter((line) => line !== "").join("\n");
 
   const useEmailJS = typeof EMAILJS_SERVICE_ID !== "undefined" && EMAILJS_SERVICE_ID;
@@ -1338,6 +1746,12 @@ async function sendServiceRequestEmail(request) {
         supplier_name: request.supplier_name || "",
         supplier_email: request.supplier_email || "",
         supplier_phone: request.supplier_phone || "",
+        photo_count: photoUrls.length,
+        photos_text: photosText,
+        photos_html: photosHtml,
+        photo_1: photoUrls[0] || "",
+        photo_2: photoUrls[1] || "",
+        photo_3: photoUrls[2] || "",
       },
       EMAILJS_PUBLIC_KEY
     )));
@@ -1347,10 +1761,17 @@ async function sendServiceRequestEmail(request) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) {
     throw new Error("No hay ningún servicio de email configurado.");
   }
+  const attachments = await buildEmailAttachments(photoAttachments, photoUrls);
   const response = await fetch(APPS_SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ emails, subject, text: message, html: buildServiceRequestEmailHtml(request) }),
+    body: JSON.stringify({
+      emails,
+      subject,
+      text: message,
+      html: buildServiceRequestEmailHtml(request, photoUrls),
+      attachments,
+    }),
   });
   const responseBody = await response.text();
   if (!response.ok) throw new Error(responseBody || `El servicio de email respondió con HTTP ${response.status}.`);
@@ -1364,7 +1785,8 @@ async function retryServiceRequestEmail(requestId) {
   const request = allServiceRequests.find((item) => item.id === requestId);
   if (!request) return;
   try {
-    await sendServiceRequestEmail(request);
+    const photoUrls = await createServicePhotoSignedUrls(request.photo_paths || []);
+    await sendServiceRequestEmail(request, { photoUrls });
     const { error } = await supabaseClient.from("maintenance_requests").update({ notification_sent: true }).eq("id", requestId);
     if (error) throw new Error(`El email se envió, pero no se pudo actualizar el historial: ${error.message}`);
     showToast("Aviso enviado al equipo");

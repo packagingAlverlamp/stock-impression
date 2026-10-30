@@ -2,7 +2,7 @@
 
 > Instrucción permanente: **responder siempre en castellano**.
 >
-> Última actualización: 29/10/2026.
+> Última actualización: 30/10/2026.
 
 ## Objetivo
 
@@ -18,8 +18,12 @@ en el servidor y no solo en el formulario.
 - El usuario pidió también propuestas de mejora de usabilidad y
   funcionalidades.
 - El registro debe limitarse a emails `@alverlamp.es`.
-- No desplegar ni aplicar la migración pendiente de maquinaria hasta que el
-  código correspondiente esté listo.
+- El menú móvil debe ser exactamente **Inventario · Taller · Escanear · Más**.
+- En escritorio se puede ver todo, agrupado por secciones; Taller agrupa
+  Máquinas y Proveedores.
+- Las solicitudes de servicio técnico deben guardar historial de estados y
+  permitir adjuntar fotos.
+
 
 ## Decisiones tomadas
 
@@ -41,6 +45,18 @@ en el servidor y no solo en el formulario.
 - Se añadió la migración
   `20261029120000_restrict_signup_domain.sql`.
 - Se añadieron cabeceras de seguridad en Vercel y el script `npm run check`.
+- La navegación móvil se redujo a cuatro pestañas: Inventario, Taller,
+  Escanear y Más. Añadir, Proveedores, Análisis y Perfil quedan dentro de Más
+  o de Taller. En escritorio el sidebar muestra todos los destinos agrupados en
+  Principal, Herramientas y Cuenta.
+- Taller agrupa Máquinas y Proveedores con pestañas internas.
+- El historial de estados de servicio técnico se guarda en
+  `maintenance_request_events` mediante trigger de Supabase.
+- Las fotos de servicio técnico se guardan en el bucket privado
+  `service-request-photos`, se comprimen en el navegador y se enlazan con URLs
+  firmadas en el correo. El Apps Script y SendGrid las adjuntan; EmailJS
+  incluye enlaces y variables `photo_1`…`photo_3` para adjuntos variables.
+
 
 ## Estado del trabajo
 
@@ -70,14 +86,29 @@ en el servidor y no solo en el formulario.
   dominio distinto sigue bloqueado.
 - Prueba de humo en navegador: la app carga sin errores de consola y el
   formulario de registro funciona.
+- Corregida la alineación de Máquinas: cabecera, tarjetas, pestañas de Taller e
+  historial comparten el ancho de contenido de 760 px y el mismo borde izquierdo
+  que Proveedores.
+- Menú móvil reducido a Inventario · Taller · Escanear · Más, verificado en un
+  viewport de 375 px.
+- Sidebar de escritorio agrupado en Principal, Herramientas y Cuenta.
+- Taller agrupa Máquinas y Proveedores con pestañas internas.
+- Servicio técnico: historial de estados con fecha y usuario, y hasta 6 fotos
+  comprimidas y guardadas en Supabase Storage.
+- Migración `20261030120000_service_request_history_and_photos.sql` aplicada
+  en Supabase remoto.
+- `npm run check` y `npm run build` pasan correctamente.
 
 ### Pendiente
 
-- Tras confirmar el despliegue, eliminar `products.category` con una migración
-  posterior.
+- Tras confirmar el nuevo despliegue, eliminar `products.category` con una
+  migración posterior.
 - Decidir si se configura SMTP antes de dar de alta empleados nuevos.
 - Probar el flujo completo de registro con confirmación por email y el enlace
   de vuelta a la web.
+- Si se quieren adjuntos reales con EmailJS, añadir en la plantilla adjuntos
+  variables llamados `photo_1`, `photo_2` y `photo_3`. Sin ese cambio, el
+  correo incluye las fotos como enlaces firmados.
 
 ### Bloqueado
 
@@ -95,17 +126,24 @@ en el servidor y no solo en el formulario.
 
 ## Ficheros relevantes
 
-- `app.js`: corrección de cierre de sesión, validación de registro, protección
-  de stock a cero, reinicio del escáner y re-renderizado responsive.
+- `app.js`: navegación responsive, corrección de cierre de sesión, validación
+  de registro, protección de stock a cero, reinicio del escáner, servicio
+  técnico con fotos e historial.
+- `style.css`: alineación de contenido, pestañas de Taller, menú móvil de
+  cuatro pestañas y sidebar de escritorio agrupado.
+- `index.html`: estructura de navegación, vistas de Taller y formularios.
 - `scripts/generate-config.js`: carga `.env.local`, valida y genera la
   configuración.
-- `api/send-email.js`: endpoint SendGrid protegido.
-- `google-apps-script/Code.gs`: envío limitado a la lista blanca del equipo.
-- `supabase/schema.sql`: `handle_new_user()` con comprobación de dominio.
+- `api/send-email.js`: endpoint SendGrid protegido y con soporte de adjuntos.
+- `google-apps-script/Code.gs`: envío limitado a la lista blanca del equipo y
+  soporte de adjuntos.
+- `supabase/schema.sql`: esquema canónico actualizado.
 - `supabase/migrations/20261029120000_restrict_signup_domain.sql`: migración
-  ya aplicada en remoto.
+  de dominio aplicada en remoto.
 - `supabase/migrations/20261026110000_machinery_and_service_requests.sql`:
-  pendiente; no aplicar todavía.
+  migración de maquinaria y solicitudes aplicada en remoto.
+- `supabase/migrations/20261030120000_service_request_history_and_photos.sql`:
+  historial de estados, fotos y bucket de Storage; aplicada en remoto.
 - `MEJORAS.md`: propuestas de usabilidad y funcionalidades.
 - `README.md`: instalación, seguridad, desarrollo local y despliegue.
 - `.env.example`: plantilla de variables de entorno.
@@ -119,7 +157,7 @@ en el servidor y no solo en el formulario.
 
 - Supabase CLI está instalado y conectado al proyecto remoto.
 - Migraciones aplicadas en remoto: `20261001000000`, `20261008130000`,
-  `20261026110000` y `20261029120000`.
+  `20261026110000`, `20261029120000` y `20261030120000`.
 - No quedan migraciones pendientes en remoto.
 - URL de producción: `https://stock-impresion.vercel.app`.
 - La configuración de producción usa `APPS_SCRIPT_URL=""` y EmailJS. El

@@ -144,12 +144,14 @@ realidad archiva.
 
 - Enviar la solicitud directamente al proveedor de la máquina, no solo al
   equipo.
-- Adjuntar fotos del problema.
-- Historial de estados con fecha y usuario (quién cambió qué).
 - Prioridad, SLA y recordatorios si sigue pendiente.
 - Plantillas de motivos frecuentes.
 
 **Impacto:** alto · **Esfuerzo:** medio-alto.
+
+> Ya implementado: adjuntar fotos del problema e historial de estados con fecha
+> y usuario (quién cambió qué). Las fotos se guardan en un bucket privado y se
+> incluyen en el aviso.
 
 ### 3.3 Mantenimiento preventivo
 

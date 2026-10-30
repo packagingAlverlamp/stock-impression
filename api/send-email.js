@@ -127,6 +127,27 @@ module.exports = async (req, res) => {
     return res.status(400).json({ ok: false, error: 'El cuerpo es obligatorio y no puede superar los 100.000 caracteres' });
   }
 
+  const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
+  if (rawAttachments.length > 6) {
+    return res.status(400).json({ ok: false, error: 'No se pueden adjuntar más de 6 fotos' });
+  }
+
+  let attachmentBytes = 0;
+  const attachments = [];
+  for (const item of rawAttachments) {
+    const filename = String(item?.filename || item?.name || '').trim().replace(/[^\w.\-]/g, '_').slice(0, 120);
+    const content = String(item?.content || '').trim();
+    const type = String(item?.type || item?.mimeType || 'image/jpeg').trim().slice(0, 100);
+    if (!filename || !content || !/^image\//i.test(type)) {
+      return res.status(400).json({ ok: false, error: 'Hay un adjunto no válido' });
+    }
+    attachmentBytes += content.length;
+    if (attachmentBytes > 16 * 1024 * 1024) {
+      return res.status(400).json({ ok: false, error: 'Los adjuntos superan el tamaño máximo permitido' });
+    }
+    attachments.push({ content, filename, type, disposition: 'attachment' });
+  }
+
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
   const sendgridFrom = process.env.SENDGRID_FROM;
   if (!sendgridApiKey || !sendgridFrom) {
@@ -141,6 +162,7 @@ module.exports = async (req, res) => {
   };
   if (safeHtml) payload.content.push({ type: 'text/html', value: safeHtml });
   if (safeText) payload.content.push({ type: 'text/plain', value: safeText });
+  if (attachments.length) payload.attachments = attachments;
 
   try {
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {

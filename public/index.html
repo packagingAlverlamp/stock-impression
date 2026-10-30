@@ -12,35 +12,54 @@
 <body>
 
   <nav class="tabbar">
-    <button type="button" class="tab-btn active" data-view="list">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      <span>Inventario</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="machines" aria-label="Maquinaria">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v11H4zM8 8V5h8v3M8 13h8M8 16h4M2 11v5M22 11v5"/></svg>
-      <span>Máquinas</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="add">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
-      <span>Añadir</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="scan">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
-      <span>Escanear</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="suppliers">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
-      <span class="nav-label-full">Proveedores</span>
-      <span class="nav-label-short">Provee.</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="analytics">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-4 3 2 5-6"/></svg>
-      <span>Análisis</span>
-    </button>
-    <button type="button" class="tab-btn" data-view="profile">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
-      <span>Perfil</span>
-    </button>
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-title">Stock Impresión</div>
+      <div class="sidebar-brand-sub">Panel de control</div>
+    </div>
+
+    <div class="nav-group nav-group-main">
+      <span class="nav-group-label">Principal</span>
+      <button type="button" class="tab-btn active" data-view="list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span>Inventario</span>
+      </button>
+      <button type="button" class="tab-btn" data-view="machines" aria-label="Taller">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v11H4zM8 8V5h8v3M8 13h8M8 16h4M2 11v5M22 11v5"/></svg>
+        <span>Taller</span>
+      </button>
+      <button type="button" class="tab-btn" data-view="scan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M4 12h16"/></svg>
+        <span>Escanear</span>
+      </button>
+      <button type="button" class="tab-btn" id="more-nav-btn" aria-label="Más opciones">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+        <span>Más</span>
+      </button>
+    </div>
+
+    <div class="nav-group nav-group-tools">
+      <span class="nav-group-label">Herramientas</span>
+      <button type="button" class="tab-btn" data-view="add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Añadir</span>
+      </button>
+      <button type="button" class="tab-btn" data-view="suppliers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
+        <span>Proveedores</span>
+      </button>
+      <button type="button" class="tab-btn" data-view="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-3 3 2 5-6"/></svg>
+        <span>Análisis</span>
+      </button>
+    </div>
+
+    <div class="nav-group nav-group-account">
+      <span class="nav-group-label">Cuenta</span>
+      <button type="button" class="tab-btn" data-view="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/></svg>
+        <span>Perfil</span>
+      </button>
+    </div>
   </nav>
 
 <div id="shell">
@@ -207,6 +226,11 @@
 
     <!-- ---------- Vista: Proveedores ---------- -->
     <main id="view-suppliers" class="view hidden">
+      <div class="workshop-tabs" role="tablist" aria-label="Secciones de taller">
+        <button type="button" class="workshop-tab" data-workshop-view="machines" role="tab" aria-selected="false">Máquinas</button>
+        <button type="button" class="workshop-tab active" data-workshop-view="suppliers" role="tab" aria-selected="true">Proveedores</button>
+      </div>
+
       <div class="section-header">
         <h2 class="section-title">Proveedores</h2>
         <button type="button" id="new-supplier-btn" class="btn btn-teal">Nuevo proveedor</button>
@@ -229,6 +253,11 @@
 
     <!-- ---------- Vista: Maquinaria ---------- -->
     <main id="view-machines" class="view hidden">
+      <div class="workshop-tabs" role="tablist" aria-label="Secciones de taller">
+        <button type="button" class="workshop-tab active" data-workshop-view="machines" role="tab" aria-selected="true">Máquinas</button>
+        <button type="button" class="workshop-tab" data-workshop-view="suppliers" role="tab" aria-selected="false">Proveedores</button>
+      </div>
+
       <div class="section-header">
         <h2 class="section-title">Maquinaria</h2>
         <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>

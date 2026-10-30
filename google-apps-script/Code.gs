@@ -99,6 +99,25 @@ function doPost(e) {
       return jsonResponse_({ success: false, error: 'El mensaje está vacío.' });
     }
 
+    // Adjuntos opcionales: [{ name, mimeType, content (base64) }].
+    var attachments = [];
+    var attachmentBytes = 0;
+    if (Array.isArray(data.attachments)) {
+      data.attachments.slice(0, 6).forEach(function (item) {
+        if (!item || !item.content) return;
+        var content = String(item.content);
+        if (attachmentBytes + content.length > 16 * 1024 * 1024) return;
+        try {
+          var name = String(item.name || 'foto.jpg').slice(0, 120);
+          var mimeType = String(item.mimeType || 'image/jpeg');
+          attachments.push(Utilities.newBlob(Utilities.base64Decode(content), mimeType, name));
+          attachmentBytes += content.length;
+        } catch (err) {
+          // Ignora adjuntos corruptos sin bloquear el envío del mensaje.
+        }
+      });
+    }
+
     var sent = [];
     recipients.forEach(function (email) {
       var options = {
@@ -107,6 +126,7 @@ function doPost(e) {
         body: message || 'Aviso de Stock Impresión'
       };
       if (html) options.htmlBody = html;
+      if (attachments.length) options.attachments = attachments;
       MailApp.sendEmail(options);
       sent.push(email);
     });

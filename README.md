@@ -182,9 +182,18 @@ genera solo, sin coste.
   `supabase/migrations/20261026110000_machinery_and_service_requests.sql`
   con `supabase db push`. Las categorías actuales de los suministros se
   convertirán en máquinas y quedarán vinculadas; asigna un proveedor a cada
-  máquina desde la sección **Maquinaria**. Las solicitudes se guardan con
-  estado e historial, y el aviso se envía a las personas que tienen activada
-  la recepción de avisos de stock y solicitudes técnicas.
+  máquina desde la sección **Taller → Máquinas**. Las solicitudes se guardan
+  con estado e historial, y el aviso se envía a las personas que tienen
+  activada la recepción de avisos de stock y solicitudes técnicas.
+- **Fotos e historial de servicio técnico**: aplica también
+  `supabase/migrations/20261030120000_service_request_history_and_photos.sql`.
+  Crea el bucket privado `service-request-photos` y la tabla
+  `maintenance_request_events`. Cada cambio de estado queda registrado con
+  fecha y usuario. Las fotos se comprimen en el navegador, se guardan en el
+  bucket y se incluyen en el aviso como enlaces firmados. Si el envío usa el
+  Apps Script, se adjuntan al correo; con EmailJS se incluyen los enlaces y
+  variables `photo_1`, `photo_2` y `photo_3` para poder configurar adjuntos
+  variables en la plantilla.
 
 - **Privacidad interna**: al ser un inventario compartido, cualquier
   persona registrada puede ver el email de las demás (es necesario para
@@ -211,11 +220,6 @@ genera solo, sin coste.
   persona confirma el correo. Esto evita que alguien se registre con una
   dirección `@alverlamp.es` que no controla. Revisa la Site URL y el SMTP en
   **Authentication** antes de usar la app en producción.
-
-  > Si todavía no vas a desplegar la maquinaria, **no ejecutes `supabase db
-  > push`**: aplicaría también la migración de máquinas. En ese caso pega
-  > únicamente el contenido de
-  > `20261029120000_restrict_signup_domain.sql` en el SQL Editor de Supabase.
 - **RLS e inventario compartido**: cualquier persona con cuenta puede ver y
   modificar el inventario, los proveedores y las máquinas. Mantén el registro
   restringido y revisa periódicamente quién tiene cuenta.
