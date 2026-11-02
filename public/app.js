@@ -26,6 +26,17 @@ let addScanner = null;
 let stockScanner = null;
 let stockScanMode = "out"; // "out" = sacar stock, "in" = añadir stock
 let scanCooldown = false;
+let allPurchaseOrders = [];
+let allPurchaseOrderItems = [];
+let allPurchaseOrderEvents = [];
+let purchaseEmail = "";
+let orderDraftItems = new Map();
+let orderDraftSupplierId = "";
+let activeOrdersSection = "new";
+let ordersLoaded = false;
+
+// Nombre con el que se saluda en el correo a compras.
+const PURCHASE_CONTACT_NAME = "Olga";
 
 const BARCODE_FORMATS = window.Html5QrcodeSupportedFormats
   ? [
@@ -48,6 +59,38 @@ function showToast(msg, ms = 3200) {
   el.classList.remove("hidden");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.add("hidden"), ms);
+}
+
+function hasOpenModal() {
+  return !!document.querySelector(".modal-backdrop");
+}
+
+async function withBusy(button, busyLabel, task) {
+  if (!button || button.dataset.busy === "true") return undefined;
+  const original = button.innerHTML;
+  button.dataset.busy = "true";
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span><span>${escapeHtml(busyLabel)}</span>`;
+  try {
+    return await task();
+  } finally {
+    button.disabled = false;
+    button.dataset.busy = "false";
+    button.removeAttribute("aria-busy");
+    button.innerHTML = original;
+  }
+}
+
+function flashSuccess(button, label = "Hecho ✓", ms = 1200) {
+  if (!button) return;
+  const original = button.innerHTML;
+  button.innerHTML = `<span>${escapeHtml(label)}</span>`;
+  button.classList.add("is-success");
+  setTimeout(() => {
+    button.innerHTML = original;
+    button.classList.remove("is-success");
+  }, ms);
 }
 
 function getCategoryOrderCookie() {
@@ -149,14 +192,17 @@ $("forgot-password-link").addEventListener("click", async () => {
   }
 
   const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
+  const button = $("forgot-password-link");
+  await withBusy(button, "Enviando…", async () => {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
 
-  if (error) {
-    showAuthError("No se pudo enviar el email: " + error.message);
-  } else {
-    showToast("Si esa cuenta existe, te hemos enviado un email para restablecer la contraseña.");
-    showLoginForms();
-  }
+    if (error) {
+      showAuthError("No se pudo enviar el email: " + error.message);
+    } else {
+      showToast("Si esa cuenta existe, te hemos enviado un email para restablecer la contraseña.");
+      showLoginForms();
+    }
+  });
 });
 
 $("cancel-reset-password").addEventListener("click", () => {
@@ -178,17 +224,20 @@ $("form-reset-password").addEventListener("submit", async (e) => {
     return;
   }
 
-  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-  if (error) {
-    showAuthError("No se pudo guardar la nueva contraseña: " + error.message);
-    return;
-  }
+  const button = e.target.querySelector('button[type="submit"]');
+  await withBusy(button, "Guardando…", async () => {
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if (error) {
+      showAuthError("No se pudo guardar la nueva contraseña: " + error.message);
+      return;
+    }
 
-  showToast("Contraseña actualizada correctamente.");
-  showLoginForms();
-  $("login-password").value = "";
-  $("reset-password").value = "";
-  $("reset-password-confirm").value = "";
+    showToast("Contraseña actualizada correctamente.");
+    showLoginForms();
+    $("login-password").value = "";
+    $("reset-password").value = "";
+    $("reset-password-confirm").value = "";
+  });
 });
 
 $("form-login").addEventListener("submit", async (e) => {
@@ -196,8 +245,11 @@ $("form-login").addEventListener("submit", async (e) => {
   $("auth-error").classList.add("hidden");
   const email = $("login-email").value.trim();
   const password = $("login-password").value;
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) showAuthError("No se ha podido entrar: " + error.message);
+  const button = e.target.querySelector('button[type="submit"]');
+  await withBusy(button, "Entrando…", async () => {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) showAuthError("No se ha podido entrar: " + error.message);
+  });
 });
 
 $("form-register").addEventListener("submit", async (e) => {
@@ -211,22 +263,28 @@ $("form-register").addEventListener("submit", async (e) => {
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) {
-    showAuthError("No se ha podido crear la cuenta: " + error.message);
-  } else if (data?.session) {
-    showToast("Cuenta creada. Ya has iniciado sesión.");
-  } else {
-    showToast("Cuenta creada. Revisa tu email para confirmarla antes de entrar.", 6000);
-    showLoginForms();
-    $("login-email").value = email;
-  }
+  const button = e.target.querySelector('button[type="submit"]');
+  await withBusy(button, "Creando cuenta…", async () => {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) {
+      showAuthError("No se ha podido crear la cuenta: " + error.message);
+    } else if (data?.session) {
+      showToast("Cuenta creada. Ya has iniciado sesión.");
+    } else {
+      showToast("Cuenta creada. Revisa tu email para confirmarla antes de entrar.", 6000);
+      showLoginForms();
+      $("login-email").value = email;
+    }
+  });
 });
 
 $("signout-btn").addEventListener("click", async () => {
   stopAddScanner();
   stopStockScanner();
-  await supabaseClient.auth.signOut();
+  const button = $("signout-btn");
+  await withBusy(button, "Saliendo…", async () => {
+    await supabaseClient.auth.signOut();
+  });
 });
 
 supabaseClient.auth.onAuthStateChange((_event, session) => {
@@ -273,7 +331,7 @@ async function enterApp() {
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "machines", "add", "scan", "suppliers", "analytics", "profile"];
+const VIEWS = ["list", "machines", "add", "scan", "suppliers", "orders", "analytics", "profile"];
 let lastView = "list";
 
 const MOBILE_NAV_VIEWS = new Set(["list", "machines", "scan"]);
@@ -313,7 +371,7 @@ function updateNavState(name) {
   if (moreButton) {
     moreButton.classList.toggle(
       "active",
-      isMobileNav() && ["add", "analytics", "profile"].includes(name)
+      isMobileNav() && ["add", "analytics", "profile", "orders"].includes(name)
     );
   }
 
@@ -346,6 +404,7 @@ function showView(name) {
     loadServiceRequests();
   }
   if (name === "analytics") showAnalyticsSection(activeAnalyticsSection);
+  if (name === "orders") openOrdersView();
   if (name === "list") {
     renderCategoryPills();
     requestAnimationFrame(() => {
@@ -372,6 +431,10 @@ function openMoreMenu() {
         <button type="button" class="more-menu-item" data-menu-view="suppliers">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
           <span>Proveedores</span>
+        </button>
+        <button type="button" class="more-menu-item" data-menu-view="orders">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12l2 4v12H4V8l2-4zM4 8h16M9 13h6M9 17h4"/></svg>
+          <span>Pedidos</span>
         </button>
         <button type="button" class="more-menu-item" data-menu-view="analytics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-3 3 2 5-6"/></svg>
@@ -472,15 +535,18 @@ $("change-password-btn").addEventListener("click", async () => {
     return;
   }
 
-  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-  if (error) {
-    showToast("No se pudo cambiar la contraseña: " + error.message);
-    return;
-  }
+  const button = $("change-password-btn");
+  await withBusy(button, "Guardando…", async () => {
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if (error) {
+      showToast("No se pudo cambiar la contraseña: " + error.message);
+      return;
+    }
 
-  $("profile-new-password").value = "";
-  $("profile-new-password-confirm").value = "";
-  showToast("Contraseña actualizada");
+    $("profile-new-password").value = "";
+    $("profile-new-password-confirm").value = "";
+    showToast("Contraseña actualizada");
+  });
 });
 
 $("delete-account-btn").addEventListener("click", async () => {
@@ -489,22 +555,25 @@ $("delete-account-btn").addEventListener("click", async () => {
   const sureAgain = confirm("Confirma otra vez: se borrará tu registro y no podrás deshacerlo. ¿Eliminar cuenta?");
   if (!sureAgain) return;
 
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-    const result = await res.json();
-    if (result.success) {
-      await supabaseClient.auth.signOut();
-      showToast("Cuenta eliminada");
-    } else {
-      showToast("Error al eliminar la cuenta: " + (result.error || ""));
+  const button = $("delete-account-btn");
+  await withBusy(button, "Eliminando…", async () => {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await res.json();
+      if (result.success) {
+        await supabaseClient.auth.signOut();
+        showToast("Cuenta eliminada");
+      } else {
+        showToast("Error al eliminar la cuenta: " + (result.error || ""));
+      }
+    } catch (err) {
+      showToast("Error al eliminar la cuenta");
     }
-  } catch (err) {
-    showToast("Error al eliminar la cuenta");
-  }
+  });
 });
 
 // ---------------------------------------------------------------
@@ -880,7 +949,9 @@ async function loadStockAnalytics() {
 populateHistoryProductFilter();
 $("history-product-filter").addEventListener("change", () => loadStockHistory(true));
 $("history-type-filter").addEventListener("change", () => loadStockHistory(true));
-$("history-load-more").addEventListener("click", () => loadStockHistory());
+$("history-load-more").addEventListener("click", () => {
+  withBusy($("history-load-more"), "Cargando…", () => loadStockHistory());
+});
 
 function renderSuppliersTable() {
   const tbody = $("suppliers-table-body");
@@ -932,12 +1003,14 @@ function renderSuppliersTable() {
       if (!sure) return;
 
       try {
-        const { error } = await supabaseClient.from("suppliers").delete().eq("id", supplier.id);
-        if (error) throw error;
+        await withBusy(btn, "Eliminando…", async () => {
+          const { error } = await supabaseClient.from("suppliers").delete().eq("id", supplier.id);
+          if (error) throw error;
 
-        await loadSuppliers();
-        await loadProducts();
-        showToast("Proveedor eliminado");
+          await loadSuppliers();
+          await loadProducts();
+          showToast("Proveedor eliminado");
+        });
       } catch (error) {
         showToast("No se pudo eliminar el proveedor: " + error.message);
       }
@@ -946,6 +1019,7 @@ function renderSuppliersTable() {
 }
 
 function openSupplierModal(supplier = null) {
+  if (hasOpenModal()) return;
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop centered";
   backdrop.innerHTML = `
@@ -997,22 +1071,25 @@ function openSupplierModal(supplier = null) {
       phone: phone || null,
     };
 
-    try {
-      if (supplier?.id) {
-        const { error } = await supabaseClient.from("suppliers").update(payload).eq("id", supplier.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabaseClient.from("suppliers").insert(payload);
-        if (error) throw error;
-      }
+    const submit = backdrop.querySelector('button[type="submit"]');
+    await withBusy(submit, "Guardando…", async () => {
+      try {
+        if (supplier?.id) {
+          const { error } = await supabaseClient.from("suppliers").update(payload).eq("id", supplier.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabaseClient.from("suppliers").insert(payload);
+          if (error) throw error;
+        }
 
-      close();
-      await loadSuppliers();
-      await loadProducts();
-      showToast(supplier ? "Proveedor actualizado" : "Proveedor guardado");
-    } catch (error) {
-      showToast("No se pudo guardar el proveedor: " + error.message);
-    }
+        close();
+        await loadSuppliers();
+        await loadProducts();
+        showToast(supplier ? "Proveedor actualizado" : "Proveedor guardado");
+      } catch (error) {
+        showToast("No se pudo guardar el proveedor: " + error.message);
+      }
+    });
   });
 }
 
@@ -1082,11 +1159,12 @@ function renderMachines() {
     button.addEventListener("click", () => openServiceRequestModal(allMachines.find((machine) => machine.id === button.dataset.machineId)));
   });
   container.querySelectorAll(".machine-archive-btn").forEach((button) => {
-    button.addEventListener("click", () => toggleMachineActive(allMachines.find((machine) => machine.id === button.dataset.machineId)));
+    button.addEventListener("click", () => toggleMachineActive(allMachines.find((machine) => machine.id === button.dataset.machineId), button));
   });
 }
 
 function openMachineModal(machine = null) {
+  if (hasOpenModal()) return;
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop centered";
   backdrop.innerHTML = `
@@ -1141,61 +1219,67 @@ function openMachineModal(machine = null) {
       return;
     }
 
-    try {
-      const query = machine
-        ? supabaseClient.from("machines").update(payload).eq("id", machine.id)
-        : supabaseClient.from("machines").insert(payload);
-      const { error } = await query;
-      if (error) throw error;
+    const submit = backdrop.querySelector('button[type="submit"]');
+    await withBusy(submit, "Guardando…", async () => {
+      try {
+        const query = machine
+          ? supabaseClient.from("machines").update(payload).eq("id", machine.id)
+          : supabaseClient.from("machines").insert(payload);
+        const { error } = await query;
+        if (error) throw error;
 
-      close();
-      await loadMachines();
-      await loadProducts();
-      showToast(machine ? "Máquina actualizada" : "Máquina guardada");
-    } catch (error) {
-      showToast("No se pudo guardar la máquina: " + error.message);
-    }
+        close();
+        await loadMachines();
+        await loadProducts();
+        showToast(machine ? "Máquina actualizada" : "Máquina guardada");
+      } catch (error) {
+        showToast("No se pudo guardar la máquina: " + error.message);
+      }
+    });
   });
 }
 
-async function toggleMachineActive(machine) {
+async function toggleMachineActive(machine, button = null) {
   if (!machine) return;
-  if (!machine.is_active) {
-    const { error } = await supabaseClient.from("machines").update({ is_active: true }).eq("id", machine.id);
-    if (error) {
-      showToast("No se pudo reactivar la máquina: " + error.message);
+
+  await withBusy(button, machine.is_active ? "Actualizando…" : "Reactivando…", async () => {
+    if (!machine.is_active) {
+      const { error } = await supabaseClient.from("machines").update({ is_active: true }).eq("id", machine.id);
+      if (error) {
+        showToast("No se pudo reactivar la máquina: " + error.message);
+        return;
+      }
+      await loadMachines();
+      showToast("Máquina reactivada");
       return;
     }
+
+    const hasProducts = allProducts.some((product) => product.machine_id === machine.id);
+    const { count: requestCount, error: requestCountError } = await supabaseClient
+      .from("maintenance_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("machine_id", machine.id);
+    if (requestCountError) {
+      showToast("No se pudo comprobar el historial de la máquina: " + requestCountError.message);
+      return;
+    }
+    const hasRequests = requestCount > 0;
+    const action = hasProducts || hasRequests ? "archivarse como inactiva" : "eliminarse";
+    if (!confirm(`¿Quieres que "${machine.name}" ${action}?${hasProducts || hasRequests ? " Se conservarán sus suministros e historial." : ""}`)) return;
+
+    const { error } = hasProducts || hasRequests
+      ? await supabaseClient.from("machines").update({ is_active: false }).eq("id", machine.id)
+      : await supabaseClient.from("machines").delete().eq("id", machine.id);
+    if (error) {
+      showToast("No se pudo eliminar la máquina: " + error.message);
+      return;
+    }
+
     await loadMachines();
-    showToast("Máquina reactivada");
-    return;
-  }
-
-  const hasProducts = allProducts.some((product) => product.machine_id === machine.id);
-  const { count: requestCount, error: requestCountError } = await supabaseClient
-    .from("maintenance_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("machine_id", machine.id);
-  if (requestCountError) {
-    showToast("No se pudo comprobar el historial de la máquina: " + requestCountError.message);
-    return;
-  }
-  const hasRequests = requestCount > 0;
-  const action = hasProducts || hasRequests ? "archivarse como inactiva" : "eliminarse";
-  if (!confirm(`¿Quieres que "${machine.name}" ${action}?${hasProducts || hasRequests ? " Se conservarán sus suministros e historial." : ""}`)) return;
-
-  const { error } = hasProducts || hasRequests
-    ? await supabaseClient.from("machines").update({ is_active: false }).eq("id", machine.id)
-    : await supabaseClient.from("machines").delete().eq("id", machine.id);
-  if (error) {
-    showToast("No se pudo eliminar la máquina: " + error.message);
-    return;
-  }
-
-  await loadMachines();
-  await loadProducts();
-  await loadServiceRequests();
-  showToast(hasProducts || hasRequests ? "Máquina archivada" : "Máquina eliminada");
+    await loadProducts();
+    await loadServiceRequests();
+    showToast(hasProducts || hasRequests ? "Máquina archivada" : "Máquina eliminada");
+  });
 }
 
 async function loadServiceRequests() {
@@ -1348,13 +1432,16 @@ function renderServiceRequests() {
     select.addEventListener("change", () => updateServiceRequestStatus(select.dataset.requestId, select.value));
   });
   container.querySelectorAll(".service-retry-btn").forEach((button) => {
-    button.addEventListener("click", () => retryServiceRequestEmail(button.dataset.requestId));
+    button.addEventListener("click", () => withBusy(button, "Enviando…", () => retryServiceRequestEmail(button.dataset.requestId)));
   });
 }
 
 async function updateServiceRequestStatus(requestId, status) {
   const request = allServiceRequests.find((item) => item.id === requestId);
   if (request?.status === status) return;
+
+  const select = document.querySelector(`.service-status-select[data-request-id="${requestId}"]`);
+  if (select) select.disabled = true;
 
   const { error } = await supabaseClient
     .from("maintenance_requests")
@@ -1466,6 +1553,7 @@ async function createServicePhotoSignedUrls(paths, expiresIn = 604800) {
 }
 
 function openServiceRequestModal(machine) {
+  if (hasOpenModal()) return;
   if (!machine?.supplier_info) {
     showToast("Asigna un proveedor a la máquina antes de solicitar servicio técnico.");
     return;
@@ -2028,7 +2116,7 @@ function renderProductList() {
   const term = $("search-input").value.trim().toLowerCase();
   const filtered = allProducts.filter((p) => {
     if (!term) return true;
-    return [p.name, p.category, p.location, p.supplier?.name, p.ean]
+    return [p.name, p.category, p.location, p.supplier?.name, p.ean, p.reference]
       .filter(Boolean)
       .some((f) => f.toLowerCase().includes(term));
   });
@@ -2076,7 +2164,7 @@ function renderProductList() {
       const items = groups[cat]
         .map((p) => {
           const low = isLowStock(p);
-          const meta = [p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
+          const meta = [p.reference ? `Ref. ${p.reference}` : '', p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
           return `
             <div class="product-row ${low ? 'low' : ''}" data-id="${p.id}">
               <div class="product-main">
@@ -2115,7 +2203,7 @@ function renderProductList() {
     container.innerHTML = finalFiltered
       .map((p) => {
         const low = isLowStock(p);
-        const meta = [p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
+        const meta = [p.reference ? `Ref. ${p.reference}` : '', p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
         return `
           <div class="product-row ${low ? 'low' : ''}">
             <div class="product-main" data-id="${p.id}">
@@ -2142,9 +2230,29 @@ function renderProductList() {
   container.querySelectorAll(".qty-stepper button").forEach((btn) => {
     btn.addEventListener("click", async (event) => {
       event.stopPropagation();
+      if (btn.dataset.busy === "true") return;
       const product = allProducts.find((p) => p.id === btn.dataset.id);
       if (!product) return;
-      await applyQuantityDelta(product, Number(btn.dataset.delta));
+
+      const row = btn.closest(".product-row");
+      const stepperButtons = row ? [...row.querySelectorAll(".qty-stepper button")] : [btn];
+      btn.dataset.busy = "true";
+      stepperButtons.forEach((button) => {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+      });
+
+      try {
+        await applyQuantityDelta(product, Number(btn.dataset.delta));
+      } finally {
+        if (btn.isConnected) {
+          stepperButtons.forEach((button) => {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+          });
+          btn.dataset.busy = "false";
+        }
+      }
     });
   });
 }
@@ -2235,10 +2343,13 @@ async function applyQuantityDelta(product, delta) {
     return null;
   }
 
-  return updateProductQuantity(product.id, newQty);
+  return updateProductQuantity(product.id, newQty, { delta });
 }
 
-async function updateProductQuantity(productId, newQty) {
+async function updateProductQuantity(productId, newQty, options = {}) {
+  const delta = Number(options.delta) || 0;
+  const pendingLinesBefore = delta > 0 ? await getPendingOrderLinesForProduct(productId) : [];
+
   const { data, error } = await supabaseClient
     .from("products")
     .update({ quantity: newQty })
@@ -2261,6 +2372,11 @@ async function updateProductQuantity(productId, newQty) {
   renderProductList();
 
   await checkLowStock(updatedProduct);
+
+  if (pendingLinesBefore.length) {
+    await reportOrderReconciliation(pendingLinesBefore);
+  }
+
   return updatedProduct;
 }
 
@@ -2392,9 +2508,1203 @@ async function sendLowStockEmail(product) {
 }
 
 // ---------------------------------------------------------------
+// Pedidos a proveedores
+// ---------------------------------------------------------------
+const ORDER_STATUS_LABELS = {
+  draft: "Borrador",
+  sent: "Enviado",
+  partial: "Parcial",
+  received: "Recibido",
+  cancelled: "Cancelado",
+};
+
+const ORDER_ITEM_STATUS_LABELS = {
+  pending: "Pendiente",
+  partial: "Parcial",
+  received: "Recibido",
+  cancelled: "Cancelado",
+};
+
+function orderStatusLabel(status) {
+  return ORDER_STATUS_LABELS[status] || status || "Sin estado";
+}
+
+function orderItemStatusLabel(status) {
+  return ORDER_ITEM_STATUS_LABELS[status] || status || "Sin estado";
+}
+
+function formatOrderNumber(order) {
+  const number = Number(order?.order_number);
+  if (!Number.isFinite(number)) return "PED-—";
+  return `PED-${String(number).padStart(4, "0")}`;
+}
+
+function formatOrderDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatUnits(value) {
+  const amount = Number(value) || 0;
+  return `${formatStockNumber(amount)} ${amount === 1 ? "ud" : "uds"}`;
+}
+
+function getOrderItems(orderId) {
+  return allPurchaseOrderItems.filter((item) => item.order_id === orderId);
+}
+
+function getOrderPendingUnits(orderId) {
+  return getOrderItems(orderId)
+    .filter((item) => item.status !== "cancelled" && item.status !== "received")
+    .reduce((sum, item) => sum + Math.max(0, Number(item.quantity_requested) - Number(item.quantity_received)), 0);
+}
+
+// ---------- Ajustes: email de compras ----------
+async function loadPurchaseEmail() {
+  const { data, error } = await supabaseClient
+    .from("app_settings")
+    .select("value")
+    .eq("key", "purchase_email")
+    .maybeSingle();
+
+  if (error) {
+    console.warn("No se pudo cargar el email de compras:", error);
+    purchaseEmail = "";
+  } else {
+    purchaseEmail = (data?.value || "").trim();
+  }
+  renderPurchaseEmailBanner();
+}
+
+function renderPurchaseEmailBanner() {
+  const value = $("purchase-email-value");
+  if (!value) return;
+  const banner = $("purchase-email-banner");
+  value.textContent = purchaseEmail || "Sin configurar";
+  banner.classList.toggle("is-missing", !purchaseEmail);
+  updateOrderSummary();
+}
+
+function openPurchaseEmailModal() {
+  if (hasOpenModal()) return;
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2>Email de compras</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <form id="purchase-email-form">
+        <div class="field">
+          <label for="purchase-email-input">Email de compras *</label>
+          <input type="email" id="purchase-email-input" required value="${escapeHtml(purchaseEmail)}" placeholder="compras@alverlamp.es" />
+          <small class="field-hint">Solo se permiten direcciones @alverlamp.es.</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </form>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  backdrop.querySelector("#purchase-email-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = $("purchase-email-input");
+    const value = input.value.trim();
+    if (!/^[^\s@]+@alverlamp\.es$/i.test(value)) {
+      showToast("El email de compras debe terminar en @alverlamp.es");
+      input.focus();
+      return;
+    }
+
+    const submit = backdrop.querySelector('button[type="submit"]');
+    await withBusy(submit, "Guardando…", async () => {
+      const { error } = await supabaseClient
+        .from("app_settings")
+        .upsert({ key: "purchase_email", value, updated_by: currentUser?.id || null }, { onConflict: "key" });
+      if (error) {
+        showToast("No se pudo guardar el email de compras: " + error.message, 6000);
+        return;
+      }
+      purchaseEmail = value;
+      renderPurchaseEmailBanner();
+      close();
+      showToast("Email de compras actualizado");
+    });
+  });
+}
+
+// ---------- Vista de pedidos ----------
+function showOrdersSection(name) {
+  activeOrdersSection = name === "tracking" ? "tracking" : "new";
+  document.querySelectorAll(".orders-view-btn").forEach((button) => {
+    const active = button.dataset.ordersView === activeOrdersSection;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll(".orders-panel").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.id !== `orders-panel-${activeOrdersSection}`);
+  });
+  if (activeOrdersSection === "tracking") renderOrdersList();
+}
+
+async function openOrdersView() {
+  const supplierFilter = $("order-supplier-filter");
+  if (supplierFilter) {
+    const current = supplierFilter.value;
+    supplierFilter.innerHTML = '<option value="">Todos los proveedores</option>' + allSuppliers
+      .filter((supplier) => supplier.name)
+      .map((supplier) => `<option value="${escapeHtml(supplier.id)}">${escapeHtml(supplier.name)}</option>`)
+      .join("");
+    if ([...supplierFilter.options].some((option) => option.value === current)) {
+      supplierFilter.value = current;
+    }
+  }
+
+  await loadPurchaseEmail();
+  await loadOrders();
+  renderOrderPicker();
+  renderOrderCart();
+  renderOrdersList();
+  showOrdersSection(activeOrdersSection);
+}
+
+async function loadOrders() {
+  const { data: orders, error } = await supabaseClient
+    .from("purchase_orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (error) {
+    console.warn("No se pudieron cargar los pedidos:", error);
+    allPurchaseOrders = [];
+    allPurchaseOrderItems = [];
+    allPurchaseOrderEvents = [];
+    ordersLoaded = false;
+    showToast("No se pudieron cargar los pedidos: " + error.message, 6000);
+    return;
+  }
+
+  allPurchaseOrders = orders || [];
+  const ids = allPurchaseOrders.map((order) => order.id);
+  allPurchaseOrderItems = [];
+  allPurchaseOrderEvents = [];
+
+  if (ids.length) {
+    const [itemsResult, eventsResult] = await Promise.all([
+      supabaseClient.from("purchase_order_items").select("*").in("order_id", ids),
+      supabaseClient.from("purchase_order_events").select("*").in("order_id", ids).order("created_at", { ascending: true }),
+    ]);
+    if (itemsResult.error) {
+      console.warn("No se pudieron cargar las líneas de pedido:", itemsResult.error);
+    } else {
+      allPurchaseOrderItems = itemsResult.data || [];
+    }
+    if (eventsResult.error) {
+      console.warn("No se pudo cargar el historial de pedidos:", eventsResult.error);
+    } else {
+      allPurchaseOrderEvents = eventsResult.data || [];
+    }
+  }
+
+  ordersLoaded = true;
+}
+
+// ---------- Nuevo pedido ----------
+function getOrderSupplier() {
+  return allSuppliers.find((supplier) => supplier.id === orderDraftSupplierId) || null;
+}
+
+function getProductSuggestedQuantity(product) {
+  return Math.max(
+    1,
+    Math.ceil((Number(product.min_quantity) || 0) - (Number(product.quantity) || 0))
+  );
+}
+
+function addProductToOrder(productId, suggested) {
+  const product = allProducts.find((item) => item.id === productId);
+  if (!product) return false;
+  if (!product.supplier_id) {
+    showToast("Asigna un proveedor a este suministro antes de pedirlo.");
+    return false;
+  }
+  if (orderDraftSupplierId && product.supplier_id !== orderDraftSupplierId) {
+    showToast("Un pedido solo puede tener suministros de un proveedor.");
+    return false;
+  }
+  if (orderDraftItems.has(product.id)) return false;
+
+  orderDraftSupplierId = product.supplier_id;
+  orderDraftItems.set(product.id, Math.max(1, Number(suggested) || 1));
+  return true;
+}
+
+function removeProductFromOrder(productId) {
+  orderDraftItems.delete(productId);
+  if (!orderDraftItems.size) orderDraftSupplierId = "";
+}
+
+function renderOrderSupplierLock() {
+  const banner = $("order-supplier-lock");
+  const name = $("order-supplier-name");
+  if (!banner || !name) return;
+
+  const supplier = getOrderSupplier();
+  banner.classList.toggle("hidden", !supplier);
+  name.textContent = supplier?.name || "—";
+}
+
+function orderProductMeta(product) {
+  return [
+    product.reference ? `Ref. ${product.reference}` : "",
+    product.ean ? `EAN ${product.ean}` : "",
+    `Stock ${formatStockNumber(product.quantity)}`,
+    `Mín. ${formatStockNumber(product.min_quantity)}`,
+  ].filter(Boolean).join(" · ");
+}
+
+function renderOrderPicker() {
+  const container = $("order-product-picker");
+  if (!container) return;
+
+  renderOrderSupplierLock();
+
+  const supplier = getOrderSupplier();
+  const lowProducts = allProducts
+    .filter((product) => isLowStock(product))
+    .filter((product) => !supplier || product.supplier_id === supplier.id)
+    .sort((a, b) => {
+      const aAvailable = a.supplier_id ? 0 : 1;
+      const bAvailable = b.supplier_id ? 0 : 1;
+      return aAvailable - bAvailable || a.name.localeCompare(b.name, "es");
+    });
+
+  const count = $("order-low-count");
+  if (count) {
+    count.textContent = lowProducts.length
+      ? `${lowProducts.length} ${lowProducts.length === 1 ? "suministro" : "suministros"}`
+      : "";
+  }
+
+  if (!lowProducts.length) {
+    container.innerHTML = supplier
+      ? '<p class="empty-state">No hay suministros con poco stock de este proveedor. Añade otro a mano si lo necesitas.</p>'
+      : '<p class="empty-state">No hay suministros por debajo del mínimo. Añade uno a mano si lo necesitas.</p>';
+    return;
+  }
+
+  container.innerHTML = lowProducts.map((product) => {
+    const missingSupplier = !product.supplier_id;
+    const selected = orderDraftItems.has(product.id);
+    const note = missingSupplier
+      ? '<span class="order-picker-note">Asigna un proveedor en su ficha</span>'
+      : "";
+
+    return `
+      <label class="order-picker-row is-low ${selected ? "is-selected" : ""} ${missingSupplier ? "is-disabled" : ""}">
+        <input type="checkbox" class="order-low-check" data-product-id="${product.id}" data-suggested="${getProductSuggestedQuantity(product)}" ${selected ? "checked" : ""} ${missingSupplier ? "disabled" : ""} />
+        <span class="order-picker-main">
+          <strong>${escapeHtml(product.name)}</strong>
+          <span class="order-picker-meta">${escapeHtml(orderProductMeta(product))}</span>
+          ${note}
+        </span>
+        <span class="order-picker-supplier">${escapeHtml(product.supplier?.name || "Sin proveedor")}</span>
+      </label>`;
+  }).join("");
+
+  container.querySelectorAll(".order-low-check").forEach((input) => {
+    input.addEventListener("change", () => {
+      if (input.checked) {
+        if (!addProductToOrder(input.dataset.productId, input.dataset.suggested)) {
+          input.checked = false;
+          return;
+        }
+      } else {
+        removeProductFromOrder(input.dataset.productId);
+      }
+      renderOrderPicker();
+      renderOrderCart();
+    });
+  });
+}
+
+function openOrderProductModal() {
+  if (hasOpenModal()) return;
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet order-product-modal">
+      <div class="modal-header">
+        <h2>Añadir suministro</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="field">
+        <label for="order-manual-search">Buscar suministro</label>
+        <input type="search" id="order-manual-search" placeholder="Nombre, referencia o EAN" />
+      </div>
+      <p id="order-manual-supplier" class="order-manual-supplier"></p>
+      <div id="order-manual-list" class="order-manual-list"></div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const search = backdrop.querySelector("#order-manual-search");
+  const list = backdrop.querySelector("#order-manual-list");
+  const supplierNote = backdrop.querySelector("#order-manual-supplier");
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  const renderList = () => {
+    const supplier = getOrderSupplier();
+    const term = search.value.trim().toLowerCase();
+
+    supplierNote.textContent = supplier
+      ? `Solo suministros de ${supplier.name}.`
+      : "Al añadir el primero se fija el proveedor del pedido.";
+
+    const products = allProducts
+      .filter((product) => !supplier || product.supplier_id === supplier.id)
+      .filter((product) => {
+        if (!term) return true;
+        return [product.name, product.reference, product.ean]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term));
+      })
+      .sort((a, b) => {
+        const aAdded = orderDraftItems.has(a.id) ? 1 : 0;
+        const bAdded = orderDraftItems.has(b.id) ? 1 : 0;
+        return aAdded - bAdded
+          || Number(isLowStock(b)) - Number(isLowStock(a))
+          || a.name.localeCompare(b.name, "es");
+      });
+
+    if (!products.length) {
+      list.innerHTML = '<p class="empty-state">No hay suministros que coincidan con la búsqueda.</p>';
+      return;
+    }
+
+    list.innerHTML = products.map((product) => {
+      const missingSupplier = !product.supplier_id;
+      const added = orderDraftItems.has(product.id);
+      const label = missingSupplier ? "Sin proveedor" : added ? "Añadido" : "Añadir";
+
+      return `
+        <div class="order-picker-row ${added ? "is-selected" : ""} ${missingSupplier ? "is-disabled" : ""}">
+          <div class="order-picker-main">
+            <strong>${escapeHtml(product.name)}</strong>
+            <span class="order-picker-meta">${escapeHtml(orderProductMeta(product))}</span>
+            <span class="order-picker-note">${escapeHtml(product.supplier?.name || "Sin proveedor")}</span>
+          </div>
+          <button type="button" class="btn btn-outline order-manual-add" data-product-id="${product.id}" data-suggested="${getProductSuggestedQuantity(product)}" ${missingSupplier || added ? "disabled" : ""}>
+            ${label}
+          </button>
+        </div>`;
+    }).join("");
+
+    list.querySelectorAll(".order-manual-add").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!addProductToOrder(button.dataset.productId, button.dataset.suggested)) return;
+        renderOrderPicker();
+        renderOrderCart();
+        renderList();
+        showToast("Suministro añadido al pedido");
+      });
+    });
+  };
+
+  search.addEventListener("input", renderList);
+  renderList();
+}
+
+function renderOrderCart() {
+  const container = $("order-cart");
+  const empty = $("order-cart-empty");
+  if (!container) return;
+
+  const entries = [...orderDraftItems.entries()]
+    .map(([productId, quantity]) => ({ product: allProducts.find((product) => product.id === productId), quantity }))
+    .filter((entry) => entry.product);
+
+  if (empty) empty.classList.toggle("hidden", entries.length > 0);
+
+  container.innerHTML = entries.map(({ product, quantity }) => {
+    const meta = [
+      product.reference ? `Ref. ${product.reference}` : "",
+      product.ean ? `EAN ${product.ean}` : "",
+      product.unit,
+    ].filter(Boolean).join(" · ");
+
+    return `
+      <div class="order-cart-row">
+        <div class="order-cart-main">
+          <strong>${escapeHtml(product.name)}</strong>
+          <span class="order-cart-meta">${escapeHtml(meta || "Sin referencia")}</span>
+        </div>
+        <input type="number" class="order-qty-input" min="1" step="1" value="${quantity}" data-product-id="${product.id}" aria-label="Cantidad de ${escapeHtml(product.name)}" />
+        <button type="button" class="order-remove-btn" data-product-id="${product.id}" aria-label="Quitar ${escapeHtml(product.name)}">&times;</button>
+      </div>`;
+  }).join("");
+
+  container.querySelectorAll(".order-qty-input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const value = Math.max(1, Math.floor(Number(input.value) || 1));
+      input.value = String(value);
+      orderDraftItems.set(input.dataset.productId, value);
+      updateOrderSummary();
+    });
+  });
+
+  container.querySelectorAll(".order-remove-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      removeProductFromOrder(button.dataset.productId);
+      renderOrderPicker();
+      renderOrderCart();
+      showToast("Suministro quitado del pedido");
+    });
+  });
+
+  updateOrderSummary();
+}
+
+function updateOrderSummary() {
+  const summary = $("order-summary");
+  const sendButton = $("order-send");
+  if (!summary || !sendButton) return;
+
+  const totalUnits = [...orderDraftItems.values()].reduce((sum, value) => sum + (Number(value) || 0), 0);
+  summary.textContent = `${orderDraftItems.size} ${orderDraftItems.size === 1 ? "referencia" : "referencias"} · ${formatStockNumber(totalUnits)} ${totalUnits === 1 ? "unidad" : "unidades"}`;
+
+  const supplier = getOrderSupplier();
+  const blocked = !purchaseEmail || !supplier || orderDraftItems.size === 0;
+  sendButton.disabled = blocked;
+  sendButton.title = blocked
+    ? (!purchaseEmail
+      ? "Configura el email de compras"
+      : !supplier
+        ? "Añade un suministro para fijar el proveedor"
+        : "Añade al menos un suministro")
+    : "";
+}
+
+function resetOrderDraft() {
+  orderDraftItems = new Map();
+  orderDraftSupplierId = "";
+  const note = $("order-note");
+  if (note) note.value = "";
+  renderOrderPicker();
+  renderOrderCart();
+}
+
+async function submitPurchaseOrder(asDraft) {
+  const supplier = getOrderSupplier();
+  const note = $("order-note").value.trim();
+  const entries = [...orderDraftItems.entries()]
+    .map(([productId, quantity]) => ({
+      product: allProducts.find((product) => product.id === productId),
+      quantity: Math.max(1, Math.floor(Number(quantity) || 1)),
+    }))
+    .filter((entry) => entry.product);
+
+  if (!purchaseEmail) {
+    showToast("Configura el email de compras antes de enviar pedidos.");
+    return;
+  }
+  if (!supplier) {
+    showToast("Añade un suministro para fijar el proveedor del pedido.");
+    return;
+  }
+  if (!entries.length) {
+    showToast("Añade al menos un suministro al pedido.");
+    return;
+  }
+  if (entries.some((entry) => entry.product.supplier_id !== supplier.id)) {
+    showToast("Todos los suministros del pedido deben ser del mismo proveedor.");
+    return;
+  }
+
+  const button = asDraft ? $("order-save-draft") : $("order-send");
+
+  await withBusy(button, asDraft ? "Guardando…" : "Enviando…", async () => {
+    let order = null;
+    try {
+      const { data, error } = await supabaseClient
+        .from("purchase_orders")
+        .insert({
+          supplier_id: supplier.id,
+          supplier_name: supplier.name || "Sin nombre",
+          supplier_email: supplier.email || null,
+          supplier_phone: supplier.phone || null,
+          purchase_email: purchaseEmail,
+          status: "draft",
+          note: note || null,
+          requested_by: currentUser?.id || null,
+          requested_by_email: currentUser?.email || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      order = data;
+
+      const itemsPayload = entries.map(({ product, quantity }) => ({
+        order_id: order.id,
+        product_id: product.id,
+        product_name: product.name,
+        product_reference: product.reference || null,
+        product_ean: product.ean || null,
+        unit: product.unit || null,
+        quantity_requested: quantity,
+      }));
+
+      const { error: itemsError } = await supabaseClient.from("purchase_order_items").insert(itemsPayload);
+      if (itemsError) {
+        await supabaseClient.from("purchase_orders").delete().eq("id", order.id);
+        throw itemsError;
+      }
+
+      if (asDraft) {
+        showToast(`Borrador ${formatOrderNumber(order)} guardado`);
+        resetOrderDraft();
+        await loadOrders();
+        showOrdersSection("tracking");
+        return;
+      }
+
+      try {
+        await sendPurchaseOrderEmails(order, itemsPayload);
+      } catch (mailError) {
+        showToast(`Pedido ${formatOrderNumber(order)} guardado como borrador. No se pudo enviar: ${mailError.message}`, 8000);
+        await loadOrders();
+        showOrdersSection("tracking");
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { error: updateError } = await supabaseClient
+        .from("purchase_orders")
+        .update({ status: "sent", sent_at: now, emails_sent: true, emails_sent_at: now })
+        .eq("id", order.id);
+      if (updateError) {
+        showToast(`Los correos se enviaron, pero no se pudo actualizar el pedido: ${updateError.message}`, 8000);
+      } else {
+        showToast(`Pedido ${formatOrderNumber(order)} enviado a compras`, 5000);
+      }
+
+      resetOrderDraft();
+      await loadOrders();
+      showOrdersSection("tracking");
+    } catch (error) {
+      showToast("No se pudo crear el pedido: " + error.message, 6000);
+    }
+  });
+}
+
+// ---------- Correos ----------
+async function getTeamEmails() {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("email")
+    .eq("notify_low_stock", true);
+  if (error) throw new Error("No se pudo obtener el equipo destinatario: " + error.message);
+
+  return [...new Set((data || [])
+    .map((profile) => (profile.email || "").trim())
+    .filter((email) => email && /^[^\s@]+@alverlamp\.es$/i.test(email)))];
+}
+
+async function sendEmailMessage({ recipients, subject, text, html, variables = {} }) {
+  const list = [...new Set((recipients || []).map((email) => String(email).trim()).filter(Boolean))];
+  if (!list.length) throw new Error("No hay destinatarios para el correo.");
+
+  const useEmailJS = typeof EMAILJS_SERVICE_ID !== "undefined" && EMAILJS_SERVICE_ID;
+  if (useEmailJS && window.emailjs && typeof window.emailjs.send === "function") {
+    for (const email of list) {
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        { to_email: email, subject, message: text, html, ...variables },
+        EMAILJS_PUBLIC_KEY
+      );
+    }
+    return;
+  }
+
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) {
+    throw new Error("No hay ningún servicio de email configurado.");
+  }
+
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emails: list, subject, text, html }),
+  });
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new Error(responseBody || `El servicio de email respondió con HTTP ${response.status}.`);
+  }
+  if (response.headers.get("content-type")?.includes("application/json")) {
+    const result = JSON.parse(responseBody);
+    if (result.success === false) throw new Error(result.error || "El servicio de email no pudo enviar el mensaje.");
+  }
+}
+
+function buildPurchaseOrderText(order, items) {
+  const supplierLines = [
+    "PROVEEDOR",
+    `Nombre: ${order.supplier_name || "Sin nombre"}`,
+  ];
+  if (order.supplier_email) supplierLines.push(`Email: ${order.supplier_email}`);
+  if (order.supplier_phone) supplierLines.push(`Teléfono: ${order.supplier_phone}`);
+
+  const lineBlocks = items.map((item, index) => {
+    const details = [
+      formatUnits(item.quantity_requested),
+      item.product_reference ? `Ref. ${item.product_reference}` : "",
+      item.product_ean ? `EAN ${item.product_ean}` : "",
+    ].filter(Boolean).join(" · ");
+    return `${index + 1}. ${details}\n   ${item.product_name}`;
+  });
+
+  const total = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
+  const lines = [
+    `Hola ${PURCHASE_CONTACT_NAME},`,
+    "Necesitamos estos suministros para la sala de impresión:",
+    "",
+    ...supplierLines,
+    "",
+    `LÍNEAS (${items.length})`,
+    ...lineBlocks,
+    "",
+    `Total: ${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"}`,
+    "",
+    `Solicitado por: ${order.requested_by_email || currentUser?.email || ""}`,
+  ];
+
+  if (order.note) {
+    lines.push("", "Observaciones:", order.note);
+  }
+  lines.push("", "Saludos.");
+  return lines.join("\n");
+}
+
+function buildPurchaseOrderHtml(order, items) {
+  const total = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
+  const rows = items.map((item) => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #eceff1;">${escapeHtml(formatUnits(item.quantity_requested))}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eceff1;font-family:monospace;">${escapeHtml(item.product_reference || "—")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eceff1;font-family:monospace;">${escapeHtml(item.product_ean || "—")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eceff1;">${escapeHtml(item.product_name)}</td>
+    </tr>`).join("");
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;">
+      <p>Hola ${escapeHtml(PURCHASE_CONTACT_NAME)},</p>
+      <p>Necesitamos estos suministros para la sala de impresión:</p>
+      <p style="margin:18px 0 6px;"><strong>PROVEEDOR</strong></p>
+      <p style="margin:0;">Nombre: ${escapeHtml(order.supplier_name || "Sin nombre")}</p>
+      ${order.supplier_email ? `<p style="margin:0;">Email: ${escapeHtml(order.supplier_email)}</p>` : ""}
+      ${order.supplier_phone ? `<p style="margin:0;">Teléfono: ${escapeHtml(order.supplier_phone)}</p>` : ""}
+      <p style="margin:18px 0 6px;"><strong>LÍNEAS (${items.length})</strong></p>
+      <table style="border-collapse:collapse;width:100%;font-size:13px;">
+        <thead>
+          <tr>
+            <th align="left" style="padding:8px 10px;border-bottom:2px solid #111827;">Unidades</th>
+            <th align="left" style="padding:8px 10px;border-bottom:2px solid #111827;">Referencia</th>
+            <th align="left" style="padding:8px 10px;border-bottom:2px solid #111827;">EAN</th>
+            <th align="left" style="padding:8px 10px;border-bottom:2px solid #111827;">Suministro</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin:18px 0 0;"><strong>Total: ${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"}</strong></p>
+      <p style="margin:18px 0 0;">Solicitado por: ${escapeHtml(order.requested_by_email || "")}</p>
+      ${order.note ? `<p style="margin:18px 0 0;"><strong>Observaciones:</strong><br />${escapeHtml(order.note)}</p>` : ""}
+      <p style="margin:18px 0 0;">Saludos.</p>
+    </div>`;
+}
+
+function buildTeamOrderText(order, items) {
+  const total = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
+  const detail = items.map((item) => {
+    const reference = item.product_reference ? ` · Ref. ${item.product_reference}` : "";
+    return `- ${formatStockNumber(item.quantity_requested)}${reference} · ${item.product_name}`;
+  });
+
+  return [
+    "Se ha enviado un pedido a compras.",
+    "",
+    `Pedido: ${formatOrderNumber(order)}`,
+    `Proveedor: ${order.supplier_name}`,
+    `Destinatario: ${order.purchase_email}`,
+    `Líneas: ${items.length} (${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"})`,
+    `Solicitado por: ${order.requested_by_email || ""}`,
+    "",
+    "Detalle:",
+    ...detail,
+  ].join("\n");
+}
+
+function buildTeamOrderHtml(order, items) {
+  const total = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
+  const detail = items.map((item) => {
+    const reference = item.product_reference ? ` · Ref. ${escapeHtml(item.product_reference)}` : "";
+    return `<li>${formatStockNumber(item.quantity_requested)}${reference} · ${escapeHtml(item.product_name)}</li>`;
+  }).join("");
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;">
+      <p>Se ha enviado un pedido a compras.</p>
+      <p>
+        <strong>Pedido:</strong> ${escapeHtml(formatOrderNumber(order))}<br />
+        <strong>Proveedor:</strong> ${escapeHtml(order.supplier_name)}<br />
+        <strong>Destinatario:</strong> ${escapeHtml(order.purchase_email)}<br />
+        <strong>Líneas:</strong> ${items.length} (${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"})<br />
+        <strong>Solicitado por:</strong> ${escapeHtml(order.requested_by_email || "")}
+      </p>
+      <p><strong>Detalle:</strong></p>
+      <ul>${detail}</ul>
+    </div>`;
+}
+
+async function sendPurchaseOrderEmails(order, items) {
+  const teamEmails = await getTeamEmails();
+  if (!teamEmails.length) throw new Error("No hay destinatarios del equipo con avisos activos.");
+
+  const variables = {
+    order_number: formatOrderNumber(order),
+    supplier_name: order.supplier_name,
+    purchase_email: order.purchase_email,
+    line_count: items.length,
+  };
+
+  await sendEmailMessage({
+    recipients: [order.purchase_email],
+    subject: `Pedido de suministros para marketing · ${order.supplier_name}`,
+    text: buildPurchaseOrderText(order, items),
+    html: buildPurchaseOrderHtml(order, items),
+    variables,
+  });
+
+  await sendEmailMessage({
+    recipients: teamEmails,
+    subject: "Pedido realizado a compras",
+    text: buildTeamOrderText(order, items),
+    html: buildTeamOrderHtml(order, items),
+    variables,
+  });
+}
+
+// ---------- Seguimiento ----------
+function renderOrderCounters() {
+  const container = $("order-counters");
+  if (!container) return;
+
+  const counts = { pending: 0, partial: 0, received: 0 };
+  allPurchaseOrders.forEach((order) => {
+    if (order.status === "sent") counts.pending += 1;
+    if (order.status === "partial") counts.partial += 1;
+    if (order.status === "received") counts.received += 1;
+  });
+
+  container.innerHTML = `
+    <div class="order-counter"><strong>${counts.pending + counts.partial}</strong><span>Pendientes</span></div>
+    <div class="order-counter"><strong>${counts.partial}</strong><span>Parciales</span></div>
+    <div class="order-counter"><strong>${counts.received}</strong><span>Recibidos</span></div>`;
+}
+
+function renderOrdersList() {
+  const container = $("orders-list");
+  const empty = $("orders-empty");
+  if (!container || !empty) return;
+
+  renderOrderCounters();
+
+  const status = $("order-status-filter").value;
+  const supplierId = $("order-supplier-filter").value;
+  const term = $("order-search").value.trim().toLowerCase();
+
+  const filtered = allPurchaseOrders.filter((order) => {
+    if (status && order.status !== status) return false;
+    if (supplierId && order.supplier_id !== supplierId) return false;
+    if (!term) return true;
+    const references = getOrderItems(order.id).map((item) => item.product_reference || "").join(" ");
+    return [formatOrderNumber(order), order.supplier_name, order.purchase_email, references]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term));
+  });
+
+  empty.classList.toggle("hidden", allPurchaseOrders.length > 0);
+
+  if (!allPurchaseOrders.length) {
+    container.innerHTML = "";
+    return;
+  }
+  if (!filtered.length) {
+    container.innerHTML = '<p class="empty-state">No hay pedidos que coincidan con los filtros.</p>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((order) => {
+    const items = getOrderItems(order.id);
+    const totalUnits = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
+    const pendingUnits = getOrderPendingUnits(order.id);
+    const summary = [
+      formatOrderDate(order.created_at),
+      `${items.length} ${items.length === 1 ? "referencia" : "referencias"}`,
+      `${formatStockNumber(totalUnits)} uds`,
+      pendingUnits > 0 ? `${formatStockNumber(pendingUnits)} pendientes` : "",
+    ].filter(Boolean).join(" · ");
+
+    return `
+      <button type="button" class="order-card" data-order-id="${order.id}">
+        <span class="order-card-main">
+          <span class="order-card-heading">
+            <strong>${escapeHtml(formatOrderNumber(order))}</strong>
+            <span class="order-status ${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span>
+          </span>
+          <span class="order-card-supplier">${escapeHtml(order.supplier_name || "Sin proveedor")}</span>
+          <span class="order-card-meta">${escapeHtml(summary)}</span>
+        </span>
+        <span class="order-card-arrow" aria-hidden="true">›</span>
+      </button>`;
+  }).join("");
+
+  container.querySelectorAll(".order-card").forEach((card) => {
+    card.addEventListener("click", () => openOrderDetailModal(card.dataset.orderId));
+  });
+}
+
+function openOrderDetailModal(orderId) {
+  if (hasOpenModal()) return;
+  const order = allPurchaseOrders.find((item) => item.id === orderId);
+  if (!order) return;
+
+  const items = getOrderItems(order.id);
+  const events = allPurchaseOrderEvents.filter((event) => event.order_id === order.id);
+  const editable = order.status === "sent" || order.status === "partial";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered";
+  backdrop.innerHTML = `
+    <div class="modal-sheet order-detail-modal">
+      <div class="modal-header">
+        <h2>${escapeHtml(formatOrderNumber(order))} · ${escapeHtml(order.supplier_name || "Sin proveedor")}</h2>
+        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <div class="order-detail-summary">
+        <div class="order-detail-block">
+          <span>Estado</span>
+          <strong><span class="order-status ${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></strong>
+        </div>
+        <div class="order-detail-block">
+          <span>Fecha</span>
+          <strong>${escapeHtml(formatOrderDate(order.created_at))}</strong>
+        </div>
+        <div class="order-detail-block">
+          <span>Solicitado por</span>
+          <strong>${escapeHtml(order.requested_by_email || "—")}</strong>
+        </div>
+        <div class="order-detail-block">
+          <span>Email de compras</span>
+          <strong>${escapeHtml(order.purchase_email)}</strong>
+        </div>
+      </div>
+
+      <div class="order-detail-block" style="margin-bottom:18px">
+        <span>Proveedor</span>
+        <strong>${escapeHtml(order.supplier_name || "Sin nombre")}</strong>
+        <p style="margin:4px 0 0;font-size:13px;color:var(--ink-soft)">
+          ${escapeHtml([order.supplier_email, order.supplier_phone].filter(Boolean).join(" · ") || "Sin datos de contacto")}
+        </p>
+      </div>
+
+      <div class="order-lines-shell">
+        <table class="order-lines-table">
+          <thead>
+            <tr>
+              <th>Referencia</th>
+              <th>Suministro</th>
+              <th>EAN</th>
+              <th>Pedido</th>
+              <th>Recibido</th>
+              <th>Pendiente</th>
+              <th>Estado</th>
+              ${editable ? "<th></th>" : ""}
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => {
+              const pending = Math.max(0, Number(item.quantity_requested) - Number(item.quantity_received));
+              return `
+                <tr>
+                  <td class="order-line-ref">${escapeHtml(item.product_reference || "—")}</td>
+                  <td>${escapeHtml(item.product_name)}</td>
+                  <td class="order-line-ref">${escapeHtml(item.product_ean || "—")}</td>
+                  <td>${escapeHtml(formatStockNumber(item.quantity_requested))}${item.unit ? ` ${escapeHtml(item.unit)}` : ""}</td>
+                  <td>${escapeHtml(formatStockNumber(item.quantity_received))}</td>
+                  <td>${escapeHtml(formatStockNumber(pending))}</td>
+                  <td>${escapeHtml(orderItemStatusLabel(item.status))}</td>
+                  ${editable ? `
+                    <td>
+                      <span class="order-line-received">
+                        <input type="number" min="0" max="${item.quantity_requested}" step="1" value="${item.quantity_received}" data-line-id="${item.id}" aria-label="Recibido de ${escapeHtml(item.product_name)}" />
+                        <button type="button" class="btn btn-outline order-line-save" data-line-id="${item.id}">Guardar</button>
+                      </span>
+                    </td>` : ""}
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      ${order.note ? `
+        <div class="order-detail-block" style="margin-bottom:18px">
+          <span>Observaciones</span>
+          <strong style="font-weight:400;white-space:pre-wrap">${escapeHtml(order.note)}</strong>
+        </div>` : ""}
+
+      <h3 class="section-subtitle" style="margin-top:0">Historial</h3>
+      <ul class="order-event-list">
+        ${events.length ? events.map((event) => `
+          <li>
+            <strong>${escapeHtml(event.status ? orderStatusLabel(event.status) : (event.source === "system" ? "Recepción automática" : "Nota"))}</strong>
+            · ${escapeHtml(formatOrderDate(event.created_at))}
+            ${event.changed_by_email ? ` · ${escapeHtml(event.changed_by_email)}` : ""}
+            ${event.note ? `<br />${escapeHtml(event.note)}` : ""}
+          </li>`).join("") : "<li>Todavía no hay movimientos registrados.</li>"}
+      </ul>
+
+      <div class="order-detail-actions">
+        ${order.status === "draft" ? '<button type="button" class="btn btn-teal" id="order-detail-send">Enviar pedido</button>' : ""}
+        ${editable ? '<button type="button" class="btn btn-outline" id="order-detail-received">Marcar todo como recibido</button>' : ""}
+        ${order.status !== "received" && order.status !== "cancelled" ? '<button type="button" class="btn btn-outline" id="order-detail-cancel" style="color:var(--red);border-color:var(--red)">Cancelar pedido</button>' : ""}
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector(".modal-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  const refreshAfterChange = async () => {
+    close();
+    await loadOrders();
+    renderOrdersList();
+  };
+
+  const sendButton = backdrop.querySelector("#order-detail-send");
+  if (sendButton) {
+    sendButton.addEventListener("click", () => resendPurchaseOrder(order, items, sendButton));
+  }
+
+  const receivedButton = backdrop.querySelector("#order-detail-received");
+  if (receivedButton) {
+    receivedButton.addEventListener("click", async () => {
+      if (!confirm(`¿Marcar el pedido ${formatOrderNumber(order)} como recibido? Se darán por recibidas todas sus líneas.`)) return;
+      await withBusy(receivedButton, "Actualizando…", async () => {
+        try {
+          const pendingItems = items.filter((item) => item.status !== "cancelled");
+          for (const item of pendingItems) {
+            const { error } = await supabaseClient
+              .from("purchase_order_items")
+              .update({ quantity_received: item.quantity_requested, status: "received" })
+              .eq("id", item.id);
+            if (error) throw error;
+          }
+          const now = new Date().toISOString();
+          const { error: orderError } = await supabaseClient
+            .from("purchase_orders")
+            .update({ status: "received", closed_at: now })
+            .eq("id", order.id);
+          if (orderError) throw orderError;
+          showToast(`Pedido ${formatOrderNumber(order)} marcado como recibido`);
+          await refreshAfterChange();
+        } catch (error) {
+          showToast("No se pudo marcar el pedido como recibido: " + error.message, 6000);
+        }
+      });
+    });
+  }
+
+  const cancelButton = backdrop.querySelector("#order-detail-cancel");
+  if (cancelButton) {
+    cancelButton.addEventListener("click", async () => {
+      if (!confirm(`¿Cancelar el pedido ${formatOrderNumber(order)}? Dejará de descontarse del stock.`)) return;
+      await withBusy(cancelButton, "Cancelando…", async () => {
+        try {
+          const { error: orderError } = await supabaseClient
+            .from("purchase_orders")
+            .update({ status: "cancelled", closed_at: new Date().toISOString() })
+            .eq("id", order.id);
+          if (orderError) throw orderError;
+
+          const itemIds = items.filter((item) => item.status !== "cancelled").map((item) => item.id);
+          if (itemIds.length) {
+            const { error: itemsError } = await supabaseClient
+              .from("purchase_order_items")
+              .update({ status: "cancelled" })
+              .in("id", itemIds);
+            if (itemsError) throw itemsError;
+          }
+          showToast(`Pedido ${formatOrderNumber(order)} cancelado`);
+          await refreshAfterChange();
+        } catch (error) {
+          showToast("No se pudo cancelar el pedido: " + error.message, 6000);
+        }
+      });
+    });
+  }
+
+  backdrop.querySelectorAll(".order-line-save").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const lineId = button.dataset.lineId;
+      const input = backdrop.querySelector(`.order-line-received input[data-line-id="${lineId}"]`);
+      if (!input) return;
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 0) {
+        showToast("Escribe una cantidad válida.");
+        return;
+      }
+
+      await withBusy(button, "…", async () => {
+        const { error } = await supabaseClient.rpc("set_purchase_order_item_received", {
+          p_item_id: lineId,
+          p_received: value,
+        });
+        if (error) {
+          showToast("No se pudo actualizar la recepción: " + error.message, 6000);
+          return;
+        }
+        showToast("Recepción actualizada");
+        close();
+        await loadOrders();
+        renderOrdersList();
+        openOrderDetailModal(order.id);
+      });
+    });
+  });
+}
+
+async function resendPurchaseOrder(order, items, button) {
+  await withBusy(button, "Enviando…", async () => {
+    try {
+      await sendPurchaseOrderEmails(order, items);
+      const now = new Date().toISOString();
+      const { error } = await supabaseClient
+        .from("purchase_orders")
+        .update({ status: "sent", sent_at: order.sent_at || now, emails_sent: true, emails_sent_at: now })
+        .eq("id", order.id);
+      if (error) throw error;
+      showToast(`Pedido ${formatOrderNumber(order)} enviado a compras`, 5000);
+      const backdrop = document.querySelector(".modal-backdrop");
+      if (backdrop) backdrop.remove();
+      await loadOrders();
+      renderOrdersList();
+    } catch (error) {
+      showToast("No se pudo enviar el pedido: " + error.message, 7000);
+    }
+  });
+}
+
+// ---------- Conciliación automática visible ----------
+async function getPendingOrderLinesForProduct(productId) {
+  if (!productId) return [];
+  const { data, error } = await supabaseClient
+    .from("purchase_order_items")
+    .select("id, order_id, quantity_requested, quantity_received, status")
+    .eq("product_id", productId)
+    .in("status", ["pending", "partial"]);
+  if (error) {
+    console.warn("No se pudieron cargar las líneas pendientes del producto:", error);
+    return [];
+  }
+  return data || [];
+}
+
+async function reportOrderReconciliation(beforeLines) {
+  if (!beforeLines || !beforeLines.length) return;
+
+  const ids = beforeLines.map((line) => line.id);
+  const { data, error } = await supabaseClient
+    .from("purchase_order_items")
+    .select("id, order_id, quantity_received")
+    .in("id", ids);
+  if (error) return;
+
+  const beforeById = new Map(beforeLines.map((line) => [line.id, Number(line.quantity_received) || 0]));
+  const changes = (data || [])
+    .map((line) => ({
+      ...line,
+      delta: (Number(line.quantity_received) || 0) - (beforeById.get(line.id) || 0),
+    }))
+    .filter((line) => line.delta > 0);
+
+  if (!changes.length) return;
+
+  const orderIds = [...new Set(changes.map((line) => line.order_id))];
+  const { data: orders } = await supabaseClient
+    .from("purchase_orders")
+    .select("id, order_number")
+    .in("id", orderIds);
+  const labels = (orders || []).map((order) => formatOrderNumber(order)).join(", ") || "pendiente";
+  const total = changes.reduce((sum, line) => sum + line.delta, 0);
+
+  showToast(`Pedido ${labels}: ${formatStockNumber(total)} uds marcadas como recibidas`, 5000);
+
+  if (ordersLoaded) {
+    await loadOrders();
+    renderOrdersList();
+  }
+}
+
+// ---------- Eventos de la vista ----------
+document.querySelectorAll(".orders-view-btn").forEach((button) => {
+  button.addEventListener("click", () => showOrdersSection(button.dataset.ordersView));
+});
+
+$("edit-purchase-email-btn").addEventListener("click", openPurchaseEmailModal);
+
+$("order-clear").addEventListener("click", () => {
+  if (!orderDraftItems.size) return;
+  if (!confirm("¿Vaciar el pedido? Se quitarán todos los suministros y podrás elegir otro proveedor.")) return;
+  orderDraftItems = new Map();
+  orderDraftSupplierId = "";
+  renderOrderPicker();
+  renderOrderCart();
+  showToast("Pedido vaciado");
+});
+
+$("order-add-manual").addEventListener("click", openOrderProductModal);
+$("order-save-draft").addEventListener("click", () => submitPurchaseOrder(true));
+$("order-send").addEventListener("click", () => submitPurchaseOrder(false));
+
+$("order-status-filter").addEventListener("change", renderOrdersList);
+$("order-supplier-filter").addEventListener("change", renderOrdersList);
+$("order-search").addEventListener("input", renderOrdersList);
+$("orders-empty-new").addEventListener("click", () => showOrdersSection("new"));
+
+// ---------------------------------------------------------------
 // Modal de edición de producto
 // ---------------------------------------------------------------
 function openEditModal(productId) {
+  if (hasOpenModal()) return;
   const p = allProducts.find((x) => x.id === productId);
   if (!p) return;
 
@@ -2411,6 +3721,10 @@ function openEditModal(productId) {
         <div class="field">
           <label>Código EAN</label>
           <input type="text" id="edit-ean" value="${escapeHtml(p.ean || "")}" />
+        </div>
+        <div class="field">
+          <label>Referencia del proveedor</label>
+          <input type="text" id="edit-reference" value="${escapeHtml(p.reference || "")}" placeholder="Ej: PF-A4-200" />
         </div>
         <div class="field">
           <label>Nombre *</label>
@@ -2462,6 +3776,7 @@ function openEditModal(productId) {
     e.preventDefault();
     const updated = {
       ean: $("edit-ean").value.trim() || null,
+      reference: $("edit-reference").value.trim() || null,
       name: $("edit-name").value.trim(),
       machine_id: $("edit-machine").value || null,
       unit: $("edit-unit").value.trim() || null,
@@ -2470,34 +3785,40 @@ function openEditModal(productId) {
       quantity: Number($("edit-quantity").value),
       min_quantity: Number($("edit-min").value),
     };
-    const { data, error } = await supabaseClient
-      .from("products")
-      .update(updated)
-      .eq("id", p.id)
-      .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
-      .single();
-    if (error) {
-      showToast("Error al guardar: " + error.message);
-      return;
-    }
-    const updatedProduct = normalizeProduct(data);
-    replaceProductInInventory(updatedProduct);
-    await checkLowStock(updatedProduct);
-    close();
-    showToast("Suministro actualizado");
+    const submitButton = backdrop.querySelector('button[type="submit"]');
+    await withBusy(submitButton, "Guardando…", async () => {
+      const { data, error } = await supabaseClient
+        .from("products")
+        .update(updated)
+        .eq("id", p.id)
+        .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
+        .single();
+      if (error) {
+        showToast("Error al guardar: " + error.message);
+        return;
+      }
+      const updatedProduct = normalizeProduct(data);
+      replaceProductInInventory(updatedProduct);
+      await checkLowStock(updatedProduct);
+      close();
+      showToast("Suministro actualizado");
+    });
   });
 
   backdrop.querySelector("#edit-delete-btn").addEventListener("click", async () => {
     const sure = confirm(`¿Eliminar "${p.name}" del inventario?`);
     if (!sure) return;
-    const { error } = await supabaseClient.from("products").delete().eq("id", p.id);
-    if (error) {
-      showToast("Error al eliminar");
-      return;
-    }
-    close();
-    showToast("Suministro eliminado");
-    loadProducts();
+    const button = backdrop.querySelector("#edit-delete-btn");
+    await withBusy(button, "Eliminando…", async () => {
+      const { error } = await supabaseClient.from("products").delete().eq("id", p.id);
+      if (error) {
+        showToast("Error al eliminar");
+        return;
+      }
+      close();
+      showToast("Suministro eliminado");
+      loadProducts();
+    });
   });
 }
 
@@ -2548,6 +3869,7 @@ $("form-add-product").addEventListener("submit", async (e) => {
   e.preventDefault();
   const payload = {
     ean: $("add-ean").value.trim() || null,
+    reference: $("add-reference").value.trim() || null,
     name: $("add-name").value.trim(),
     machine_id: $("add-machine").value || null,
     unit: $("add-unit").value.trim() || null,
@@ -2557,27 +3879,30 @@ $("form-add-product").addEventListener("submit", async (e) => {
     min_quantity: Number($("add-min").value),
   };
 
-  const { data, error } = await supabaseClient
-    .from("products")
-    .insert(payload)
-    .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
-    .single();
-  if (error) {
-    if (error.message.includes("duplicate")) {
-      showToast("Ya existe un suministro con ese código EAN");
-    } else {
-      showToast("Error al guardar: " + error.message);
+  const submitButton = e.target.querySelector('button[type="submit"]');
+  await withBusy(submitButton, "Guardando…", async () => {
+    const { data, error } = await supabaseClient
+      .from("products")
+      .insert(payload)
+      .select("*, supplier_info:suppliers!products_supplier_id_fkey(id, name, email, phone), machine_info:machines!products_machine_id_fkey(id, name)")
+      .single();
+    if (error) {
+      if (error.message.includes("duplicate")) {
+        showToast("Ya existe un suministro con ese código EAN");
+      } else {
+        showToast("Error al guardar: " + error.message);
+      }
+      return;
     }
-    return;
-  }
 
-  await checkLowStock(normalizeProduct(data));
-  showToast("Suministro añadido");
-  e.target.reset();
-  $("add-quantity").value = 0;
-  $("add-min").value = 1;
-  await loadProducts();
-  showView("list");
+    await checkLowStock(normalizeProduct(data));
+    showToast("Suministro añadido");
+    e.target.reset();
+    $("add-quantity").value = 0;
+    $("add-min").value = 1;
+    await loadProducts();
+    showView("list");
+  });
 });
 
 // ---------------------------------------------------------------
@@ -2686,10 +4011,13 @@ async function onStockScan(ean) {
     input.value = Number(input.value) + 1;
   });
   $("scan-confirm").addEventListener("click", async () => {
+    const button = $("scan-confirm");
     const amount = Number($("scan-delta").value) || 1;
     const delta = stockScanMode === "out" ? -amount : amount;
-    const updated = await applyQuantityDelta(product, delta);
-    if (updated) showToast(`${label}: ${amount} × ${product.name}`);
+    await withBusy(button, "Aplicando…", async () => {
+      const updated = await applyQuantityDelta(product, delta);
+      if (updated) showToast(`${label}: ${amount} × ${product.name}`);
+    });
     resumeScan();
   });
   $("scan-resume").addEventListener("click", resumeScan);

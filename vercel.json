@@ -26,6 +26,10 @@
     {
       "path": "/api/weekly-low-stock.js",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/partial-order-reminders.js",
+      "schedule": "0 9 * * *"
     }
   ]
 }

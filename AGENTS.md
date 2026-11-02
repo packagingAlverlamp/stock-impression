@@ -2,7 +2,7 @@
 
 > Instrucción permanente: **responder siempre en castellano**.
 >
-> Última actualización: 30/10/2026.
+> Última actualización: 02/11/2026.
 
 ## Objetivo
 
@@ -23,6 +23,14 @@ en el servidor y no solo en el formulario.
   Máquinas y Proveedores.
 - Las solicitudes de servicio técnico deben guardar historial de estados y
   permitir adjuntar fotos.
+- Debe existir un módulo **Pedidos** con proveedor único por pedido, email de
+  compras `@alverlamp.es`, seguimiento y conciliación automática de stock.
+- La ficha de producto debe incluir el campo **Referencia**.
+- Máquina y Proveedor deben tener la misma altura que el resto de campos.
+- Toda acción debe dar feedback y bloquearse mientras trabaja (sin dobles
+  clics ni botones que parezcan no pulsados).
+- En la sesión del 30/10/2026 el usuario pidió **solo documentar** estos
+  cambios; la implementación se hace en la siguiente sesión.
 
 
 ## Decisiones tomadas
@@ -56,6 +64,38 @@ en el servidor y no solo en el formulario.
   `service-request-photos`, se comprimen en el navegador y se enlazan con URLs
   firmadas en el correo. El Apps Script y SendGrid las adjuntan; EmailJS
   incluye enlaces y variables `photo_1`…`photo_3` para adjuntos variables.
+- Pedidos implementado (02/11/2026) según `PLAN_PEDIDOS.md`:
+  - Un pedido = un proveedor; el correo va al **email de compras**, no al
+    proveedor, con sus datos en el cuerpo.
+  - Email de compras global en `app_settings` (`purchase_email`), validado con
+    CHECK de dominio `@alverlamp.es` en base de datos.
+  - Tablas `purchase_orders`, `purchase_order_items` y
+    `purchase_order_events`, con copias históricas de nombre, referencia, EAN,
+    unidad y datos del proveedor.
+  - Estados `draft`, `sent`, `partial`, `received`, `cancelled`.
+  - Conciliación automática mediante trigger sobre `stock_movements` de tipo
+    `entry`, FIFO por pedido más antiguo; las recepciones parciales dejan la
+    línea en `partial`.
+  - Dos correos: pedido a compras y aviso al equipo con asunto exacto
+    “Pedido realizado a compras”. El saludo a compras usa
+    `PURCHASE_CONTACT_NAME = "Olga"` en `app.js`.
+  - El flujo de Nuevo pedido se invirtió el 02/11/2026: primero se muestran los
+    suministros con poco stock de todos los proveedores; al marcar el primero se
+    fija el proveedor y la lista y el buscador manual se limitan a ese
+    proveedor. Los suministros sin proveedor aparecen deshabilitados. Los que
+    no están bajo mínimo se añaden con “Añadir otro suministro”.
+  - “Recibido” se marca automáticamente al escanear o entrar stock; los
+    ajustes manuales quedan como corrección.
+  - Aviso de recepción parcial: pasados 7 días desde la primera recepción, un
+    cron diario envía un único correo a todos los usuarios `@alverlamp.es`
+    excepto el email de compras, y guarda `partial_notified_at`.
+  - La referencia se añadió a `products.reference` y se muestra en tarjeta,
+    búsqueda y correos.
+  - Los selects Máquina/Proveedor quedan a 46 px con `appearance: none` y
+    chevron propio.
+  - Auditoría de botones: helper `withBusy`, `flashSuccess`, CSS
+    `.btn:disabled` + spinner, bloqueo de modales duplicados y feedback en las
+    acciones principales (tabla completa en `PLAN_PEDIDOS.md`, sección 8).
 
 
 ## Estado del trabajo
@@ -101,6 +141,42 @@ en el servidor y no solo en el formulario.
 - Commit `f31b74d` subido a `origin/main` y desplegado en Vercel.
 - Verificado en producción: la web carga sin errores de consola y el menú de
   escritorio muestra las secciones Principal, Herramientas y Cuenta.
+- Documentación de la próxima iteración redactada en `PLAN_PEDIDOS.md`:
+  modelo de datos, migración, navegación, flujos, correos, conciliación
+  automática, referencia de producto, altura de selects y auditoría de botones.
+- `MEJORAS.md` actualizado: Pedidos (3.1) figura como implementado.
+- Pedidos implementado el 02/11/2026:
+  - Migración `20261102120000_purchase_orders.sql` creada y aplicada en remoto:
+    referencia, `app_settings`, pedidos, líneas, historial, triggers de
+    conciliación, RPC `set_purchase_order_item_received`, RLS y permisos.
+  - `supabase/schema.sql` actualizado con el mismo bloque.
+  - Vista `#view-orders` con pestañas “Nuevo pedido” y “Seguimiento”. Nuevo
+    pedido muestra primero los suministros con poco stock; al marcar el primero
+    se fija el proveedor y solo se pueden añadir suministros suyos. El resto se
+    añade con “Añadir otro suministro”. Incluye carrito, observaciones,
+    borrador y envío.
+  - Email de compras editable desde la propia vista y validado en formulario y
+    base de datos.
+  - Correos con el copy acordado: pedido a compras y aviso al equipo con
+    asunto “Pedido realizado a compras”.
+  - Seguimiento con contadores, filtros, búsqueda, detalle por línea,
+    historial, reenvío, cancelación y recepción total o parcial.
+  - “Recibido” se marca solo al entrar stock o al escanear el suministro; el
+    trigger concilia la entrada con el pedido abierto más antiguo.
+  - Aviso único de recepción parcial: un cron diario envía a todos los usuarios
+    `@alverlamp.es` excepto compras cuando un pedido lleva 7 días en estado
+    `partial` desde la primera recepción.
+  - Conciliación visible al entrar stock desde el stepper, el escaneo o la
+    ficha: muestra qué pedido y cuántas unidades se han conciliado.
+  - Campo Referencia en alta, edición, tarjeta y búsqueda.
+  - Selects a 46 px y estilos de botones con `withBusy`, spinner y estado de
+    éxito.
+  - Pestañas de Pedidos con el mismo estilo que las de Análisis (subrayado
+    teal en la activa), verificado en navegador.
+  - `npm run check` y `npm run build` pasan correctamente.
+  - Verificado en navegador local con datos simulados: sin errores de consola,
+    picker y carrito (2 referencias · 5 unidades), lista de seguimiento y modal
+    de detalle.
 
 ### Pendiente
 
@@ -109,6 +185,14 @@ en el servidor y no solo en el formulario.
 - Decidir si se configura SMTP antes de dar de alta empleados nuevos.
 - Probar el flujo completo de registro con confirmación por email y el enlace
   de vuelta a la web.
+- Configurar en la plantilla de EmailJS el asunto `{{subject}}` y el cuerpo
+  `{{message}}` para que el aviso lleve el asunto exigido; añadir
+  `compras@alverlamp.es` a `TEAM_EMAILS` si se usa Apps Script.
+- Probar en producción un pedido real con EmailJS y una entrada de stock que
+  concilie la línea y marque “Recibido”.
+- Probar el cron de recepción parcial (`/api/partial-order-reminders.js`) con
+  `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` y `EMAILJS_PRIVATE_KEY`
+  configurados en Vercel.
 - Si se quieren adjuntos reales con EmailJS, añadir en la plantilla adjuntos
   variables llamados `photo_1`, `photo_2` y `photo_3`. Sin ese cambio, el
   correo incluye las fotos como enlaces firmados.
@@ -121,22 +205,28 @@ en el servidor y no solo en el formulario.
 
 ## Siguiente paso
 
-1. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
+1. Revisar el cambio de Pedidos y hacer commit + push a `origin/main` cuando el
+   usuario lo confirme.
+2. Configurar EmailJS (`{{subject}}`/`{{message}}`), probar en producción un
+   pedido real, su conciliación al entrar stock y el cron de recepción parcial.
+3. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
    comprobar que el enlace devuelve a la web con la sesión iniciada.
-2. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
-3. Probar una solicitud de servicio técnico completa con fotos desde una
+4. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
+5. Probar una solicitud de servicio técnico completa con fotos desde una
    cuenta real y revisar el correo recibido.
-4. Crear y aplicar una migración posterior para eliminar `products.category`
-   cuando la versión nueva lleve un tiempo publicada.
+6. Crear y aplicar una migración posterior para eliminar `products.category`.
 
 ## Ficheros relevantes
 
 - `app.js`: navegación responsive, corrección de cierre de sesión, validación
   de registro, protección de stock a cero, reinicio del escáner, servicio
-  técnico con fotos e historial.
+  técnico con fotos e historial, módulo de pedidos, referencia de producto,
+  conciliación visible y helpers `withBusy`/`flashSuccess`.
 - `style.css`: alineación de contenido, pestañas de Taller, menú móvil de
-  cuatro pestañas y sidebar de escritorio agrupado.
-- `index.html`: estructura de navegación, vistas de Taller y formularios.
+  cuatro pestañas, sidebar de escritorio agrupado, campos a 46 px, estados de
+  botones y estilos de Pedidos.
+- `index.html`: estructura de navegación, vistas de Taller, Pedidos y
+  formularios, incluido el campo Referencia.
 - `scripts/generate-config.js`: carga `.env.local`, valida y genera la
   configuración.
 - `api/send-email.js`: endpoint SendGrid protegido y con soporte de adjuntos.
@@ -150,25 +240,45 @@ en el servidor y no solo en el formulario.
 - `supabase/migrations/20261030120000_service_request_history_and_photos.sql`:
   historial de estados, fotos y bucket de Storage; aplicada en remoto.
 - `MEJORAS.md`: propuestas de usabilidad y funcionalidades.
+- `PLAN_PEDIDOS.md`: especificación original de Pedidos, referencia, altura de
+  selects y auditoría de botones; ya implementada.
+- `supabase/migrations/20261102120000_purchase_orders.sql`: pedidos,
+  referencia, `app_settings`, historial, conciliación y RPC; aplicada en remoto.
+- `supabase/migrations/20261102130000_partial_order_reminders.sql`: primera
+  recepción, aviso único y ajuste de las funciones de conciliación; aplicada en
+  remoto.
+- `api/partial-order-reminders.js`: cron diario que avisa al equipo de pedidos
+  parciales con 7 días.
 - `README.md`: instalación, seguridad, desarrollo local y despliegue.
 - `.env.example`: plantilla de variables de entorno.
 - `.env.local`: configuración local; está ignorada por Git.
 - `config.js` y `public/config.js`: configuración generada.
 - `package.json`: scripts `config` y `check`.
-- `vercel.json`: cabeceras de seguridad.
+- `vercel.json`: cabeceras de seguridad y los dos crons (stock bajo y pedidos
+  parciales).
 - `.gitignore`: permite `.env.example` e ignora `supabase/.temp/`.
 
 ## Contexto importante
 
 - Supabase CLI está instalado y conectado al proyecto remoto.
 - Migraciones aplicadas en remoto: `20261001000000`, `20261008130000`,
-  `20261026110000`, `20261029120000` y `20261030120000`.
+  `20261026110000`, `20261029120000`, `20261030120000`, `20261102120000` y
+  `20261102130000`.
 - No quedan migraciones pendientes en remoto.
 - URL de producción: `https://stock-impresion.vercel.app`.
 - La configuración de producción usa `APPS_SCRIPT_URL=""` y EmailJS. El
   endpoint SendGrid no lo usa actualmente la app. Por eso las fotos se envían
   como enlaces firmados dentro del mensaje; para adjuntarlas de verdad con
   EmailJS hay que configurar adjuntos variables en la plantilla.
+- La plantilla de EmailJS debe usar `{{subject}}` como asunto y `{{message}}`
+  como cuerpo; si no, el aviso al equipo no llevará “Pedido realizado a
+  compras”. El email de compras (`compras@alverlamp.es` por defecto) debe
+  estar en `TEAM_EMAILS` si se usa Apps Script, porque el script solo envía a
+  esa lista blanca.
+- Vercel ejecuta dos crons: resumen semanal de stock bajo (lunes) y aviso de
+  pedidos parciales (diario a las 09:00 UTC). Ambos requieren `CRON_SECRET`,
+  `SUPABASE_SERVICE_ROLE_KEY` y `EMAILJS_PRIVATE_KEY`; el plan Hobby permite
+  exactamente dos cron jobs.
 - **Confirmación de email activada**: la configuración remota devuelve
   `mailer_autoconfirm: false`. Al registrarse, Supabase envía un correo y la
   cuenta no tiene acceso hasta confirmarlo.
@@ -188,6 +298,7 @@ en el servidor y no solo en el formulario.
   auditoría como comentario.
 - No exponer valores privados de `.env.local`.
 - `public/` se genera pero está versionado; el build lo actualiza.
-- El código de esta iteración está commiteado y subido a `origin/main`.
+- El código de la iteración anterior está en `origin/main`; los cambios de
+  Pedidos de esta sesión están sin commitear hasta que el usuario lo confirme.
 - La memoria se actualiza después del despliegue; si hay cambios locales
   posteriores, reflejarlos aquí.

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "config": "node scripts/generate-config.js",
-    "check": "node --check app.js && node --check api/send-email.js && node --check api/weekly-low-stock.js && node --check scripts/generate-config.js",
+    "check": "node --check app.js && node --check api/send-email.js && node --check api/weekly-low-stock.js && node --check api/partial-order-reminders.js && node --check scripts/generate-config.js",
     "build": "node scripts/generate-config.js && mkdir -p public && cp index.html app.js style.css public/ && mkdir -p public/img && cp -R img/. public/img/"
   },
   "dependencies": {

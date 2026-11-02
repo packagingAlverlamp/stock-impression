@@ -132,11 +132,22 @@ realidad archiva.
 
 ### 3.1 Pedidos de reposición a proveedores
 
-- Generar un pedido desde los productos bajo mínimo, agrupado por proveedor.
-- Enviar el pedido por email al proveedor (no solo al equipo).
-- Estados: borrador, enviado, recibido parcial, recibido, cancelado.
-- Al recibir, crear entradas de stock automáticamente.
-- Historial de precios y plazos de entrega por proveedor.
+> **Estado: implementado (02/11/2026).** La especificación original sigue en
+> [`PLAN_PEDIDOS.md`](PLAN_PEDIDOS.md).
+
+- Vista **Pedidos** en Herramientas (escritorio) y en Más (móvil).
+- Un pedido por proveedor, con los suministros de poco stock como punto de
+  partida. Al marcar el primero se fija el proveedor y el resto se añade a mano.
+- Recepción automática al escanear; si queda parte pendiente, aviso único al
+  equipo a los 7 días (sin incluir a compras).
+- Email de compras configurable (`@alverlamp.es`) y validado en base de datos.
+- Correo al email de compras con referencia, EAN, cantidad y datos del
+  proveedor, más aviso al equipo con asunto “Pedido realizado a compras”.
+- Seguimiento con estados, historial y detalle por línea.
+- Conciliación automática: al entrar stock, se descuenta del pedido pendiente.
+- Referencia de proveedor en la ficha de producto.
+- Historial de precios y plazos de entrega por proveedor: pendiente para una
+  fase posterior.
 
 **Impacto:** muy alto · **Esfuerzo:** alto.
 

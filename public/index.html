@@ -47,6 +47,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
         <span>Proveedores</span>
       </button>
+      <button type="button" class="tab-btn" data-view="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12l2 4v12H4V8l2-4zM4 8h16M9 13h6M9 17h4"/></svg>
+        <span>Pedidos</span>
+      </button>
       <button type="button" class="tab-btn" data-view="analytics">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h17M8 15l4-3 3 2 5-6"/></svg>
         <span>Análisis</span>
@@ -166,6 +170,10 @@
           <input type="text" id="add-ean" inputmode="numeric" placeholder="Ej: 8412345678901" />
         </div>
         <div class="field">
+          <label for="add-reference">Referencia del proveedor (opcional)</label>
+          <input type="text" id="add-reference" placeholder="Ej: PF-A4-200" />
+        </div>
+        <div class="field">
           <label for="add-name">Nombre del suministro *</label>
           <input type="text" id="add-name" required placeholder="Ej: Papel fotográfico A4" />
         </div>
@@ -267,6 +275,92 @@
       <section class="service-history-section">
         <h2 class="section-title">Solicitudes de servicio técnico</h2>
         <div id="service-requests-list" class="service-requests-list"></div>
+      </section>
+    </main>
+
+    <!-- ---------- Vista: Pedidos ---------- -->
+    <main id="view-orders" class="view hidden">
+      <div class="analytics-subnav" role="tablist" aria-label="Secciones de pedidos">
+        <button type="button" class="orders-view-btn active" data-orders-view="new" role="tab" aria-selected="true">Nuevo pedido</button>
+        <button type="button" class="orders-view-btn" data-orders-view="tracking" role="tab" aria-selected="false">Seguimiento</button>
+      </div>
+
+      <section id="orders-panel-new" class="orders-panel">
+        <h2 class="section-title">Nuevo pedido</h2>
+        <p class="page-intro">Los pedidos se envían al email de compras. Cada pedido va a un único proveedor.</p>
+
+        <div id="purchase-email-banner" class="purchase-email-banner">
+          <div class="purchase-email-info">
+            <span class="purchase-email-label">Email de compras</span>
+            <strong id="purchase-email-value">—</strong>
+          </div>
+          <button type="button" id="edit-purchase-email-btn" class="btn btn-outline">Cambiar</button>
+        </div>
+
+        <div id="order-supplier-lock" class="order-supplier-lock hidden">
+          <div class="order-supplier-info">
+            <span class="purchase-email-label">Proveedor del pedido</span>
+            <strong id="order-supplier-name">—</strong>
+          </div>
+          <button type="button" id="order-clear" class="btn btn-outline">Vaciar pedido</button>
+        </div>
+
+        <div class="order-low-header">
+          <h3 class="section-subtitle">Queda poco</h3>
+          <span id="order-low-count" class="order-low-count"></span>
+        </div>
+        <p class="page-intro order-low-intro">Marca los suministros que quieras pedir. Al añadir el primero se fija el proveedor del pedido.</p>
+
+        <div id="order-product-picker" class="order-product-picker"></div>
+
+        <button type="button" id="order-add-manual" class="btn btn-outline order-add-manual">+ Añadir otro suministro</button>
+
+        <h3 class="section-subtitle">Pedido</h3>
+        <div id="order-cart" class="order-cart"></div>
+        <div id="order-cart-empty" class="empty-state order-cart-empty">Marca un suministro de la lista o añádelo a mano.</div>
+
+        <div class="field">
+          <label for="order-note">Observaciones para compras</label>
+          <textarea id="order-note" rows="3" placeholder="Plazo, urgencia, referencias alternativas..."></textarea>
+        </div>
+
+        <div class="order-summary" id="order-summary">0 referencias · 0 unidades</div>
+        <button type="button" id="order-save-draft" class="btn btn-outline">Guardar borrador</button>
+        <button type="button" id="order-send" class="btn btn-primary" disabled>Enviar pedido a compras</button>
+      </section>
+
+      <section id="orders-panel-tracking" class="orders-panel hidden">
+        <h2 class="section-title">Seguimiento de pedidos</h2>
+        <div id="order-counters" class="order-counters"></div>
+
+        <div class="history-filters">
+          <label class="field">
+            <span>Estado</span>
+            <select id="order-status-filter">
+              <option value="">Todos</option>
+              <option value="draft">Borradores</option>
+              <option value="sent">Enviados</option>
+              <option value="partial">Parciales</option>
+              <option value="received">Recibidos</option>
+              <option value="cancelled">Cancelados</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Proveedor</span>
+            <select id="order-supplier-filter">
+              <option value="">Todos los proveedores</option>
+            </select>
+          </label>
+        </div>
+        <div class="order-search-row">
+          <input type="search" id="order-search" placeholder="Buscar por número, proveedor o referencia" />
+        </div>
+
+        <div id="orders-list" class="orders-list"></div>
+        <div id="orders-empty" class="empty-state hidden">
+          <p>Todavía no hay pedidos.</p>
+          <button type="button" class="btn btn-teal" id="orders-empty-new">Crear el primero</button>
+        </div>
       </section>
     </main>
 

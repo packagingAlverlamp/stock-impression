@@ -95,7 +95,8 @@ automáticamente los permisos necesarios en la función.
    y añade:
    - `TEAM_EMAILS`: los emails del equipo separados por comas. Es
      **obligatorio**: el script solo envía a direcciones que estén en esta
-     lista.
+     lista. Incluye el email de compras (por ejemplo `compras@alverlamp.es`)
+     y a todas las personas que deban recibir avisos, también los de pedidos.
    - `MAX_EMAILS_PER_HOUR` (opcional): límite de envíos por hora. Por
      defecto 60.
 6. Pulsa **Implementar**. Google te pedirá autorizar permisos (enviar
@@ -194,6 +195,26 @@ genera solo, sin coste.
   Apps Script, se adjuntan al correo; con EmailJS se incluyen los enlaces y
   variables `photo_1`, `photo_2` y `photo_3` para poder configurar adjuntos
   variables en la plantilla.
+- **Pedidos a proveedores y referencia de producto**: aplica
+  `supabase/migrations/20261102120000_purchase_orders.sql` con
+  `supabase db push`. Añade el campo `products.reference`, la tabla de ajustes
+  `app_settings`, los pedidos (`purchase_orders`, `purchase_order_items`,
+  `purchase_order_events`), la numeración `PED-0001`, el historial de estados y
+  la conciliación automática de stock. El email de compras se guarda en
+  **Pedidos → Cambiar** (clave `purchase_email` de `app_settings`) y la base de
+  datos exige que termine en `@alverlamp.es`. En **Nuevo pedido** se muestran
+  primero los suministros con poco stock; al marcar el primero se fija el
+  proveedor y solo se pueden añadir suministros suyos. Los que no están bajo
+  mínimo se añaden con **Añadir otro suministro**. Cuando entra stock de un
+  producto con líneas pendientes, el trigger descuenta las unidades del pedido
+  más antiguo y marca la línea como recibida al completarse; las recepciones
+  parciales dejan el pedido en `partial`. Desde el detalle se puede corregir la
+  cantidad recibida o forzar la recepción total.
+- **Aviso de recepción parcial**: aplica
+  `supabase/migrations/20261102130000_partial_order_reminders.sql`. Guarda la
+  primera recepción y la fecha del aviso. Un cron diario envía un único correo
+  a todo el equipo `@alverlamp.es` (excepto compras) cuando un pedido lleva 7
+  días en estado parcial.
 
 - **Privacidad interna**: al ser un inventario compartido, cualquier
   persona registrada puede ver el email de las demás (es necesario para
@@ -284,7 +305,13 @@ curl -X POST https://stock-impresion.vercel.app/api/send-email \
      `product_name`, `quantity`, `min_quantity`, `category`, `machine_name`,
      `machine_model`, `machine_serial_number`, `request_reason`,
      `supplier_name`, `supplier_email`, `supplier_phone`. La misma plantilla
-     sirve para los avisos de stock y las solicitudes de servicio técnico.
+     sirve para los avisos de stock, las solicitudes de servicio técnico y los
+     pedidos.
+     - **Importante para pedidos**: el asunto debe ser `{{subject}}` y el
+       cuerpo `{{message}}`. Si la plantilla tiene un asunto fijo, el aviso al
+       equipo no llevará el asunto exigido “Pedido realizado a compras”.
+     - Variables adicionales de pedidos: `order_number`, `supplier_name`,
+       `purchase_email` y `line_count`.
   3. En Vercel (Project → Settings → Environment Variables) añade:
      - `EMAILJS_SERVICE_ID` — ID del Service.
      - `EMAILJS_TEMPLATE_ID` — ID de la plantilla.
@@ -295,3 +322,21 @@ curl -X POST https://stock-impresion.vercel.app/api/send-email \
 
 No necesitas curl: una vez configurado, la app enviará los avisos
 automáticamente.
+
+## Avisos automáticos por cron
+
+Vercel ejecuta dos tareas programadas. Ambas necesitan la variable
+`CRON_SECRET`; Vercel la envía en la cabecera `Authorization: Bearer …`.
+
+- **Lunes a las 09:00 UTC**: resumen semanal de stock bajo
+  (`/api/weekly-low-stock.js`).
+- **Todos los días a las 09:00 UTC**: aviso de pedidos recibidos parcialmente
+  (`/api/partial-order-reminders.js`). Si un pedido lleva 7 días en estado
+  `partial` desde la primera recepción, envía un único correo a todos los
+  usuarios `@alverlamp.es` excepto el email de compras. Después guarda
+  `partial_notified_at` para no repetirlo.
+
+Además de `CRON_SECRET`, los dos endpoints necesitan
+`SUPABASE_SERVICE_ROLE_KEY`, `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`,
+`EMAILJS_PUBLIC_KEY` y `EMAILJS_PRIVATE_KEY`. El plan Hobby de Vercel permite
+dos cron jobs; este proyecto usa exactamente dos.
