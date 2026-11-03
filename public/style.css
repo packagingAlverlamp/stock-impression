@@ -135,6 +135,16 @@ a { color: var(--teal); }
   align-items: center;
   gap: 12px;
 }
+.topbar-titles { min-width: 0; }
+.topbar-eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
 .header-brand-mark {
   width: 26px;
   height: 26px;
@@ -255,24 +265,36 @@ a { color: var(--teal); }
 }
 
 .auth-switch {
-  margin-top: 18px;
-  text-align: center;
-  font-size: 14px;
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--ink-soft);
+  text-align: center;
+}
+.auth-switch-item { white-space: nowrap; }
+.auth-switch-sep {
+  flex: 0 0 auto;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--line-strong);
 }
 .auth-switch button {
-  background: none; border: none; color: var(--teal); font-weight: 600; cursor: pointer; text-decoration: underline;
+  background: none; border: none; color: var(--teal); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline;
 }
+.auth-switch button:hover { color: #0b6a59; }
 
-.auth-link-row {
-  margin-top: 12px;
-  text-align: center;
-}
 .text-link {
   background: none;
   border: none;
   padding: 0;
   color: var(--teal);
+  font: inherit;
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
@@ -2383,4 +2405,162 @@ label.order-picker-row:hover { border-color: var(--line-strong); }
     padding-left: 28px;
     padding-right: 28px;
   }
+}
+
+/* ============================================================
+   Pantalla de acceso y proporciones de escritorio
+   ============================================================ */
+
+/* Evita parpadeo mientras se resuelve la sesión */
+body.booting #shell { visibility: hidden; }
+
+/* Modo acceso: sin menú lateral y con tarjeta centrada */
+body.auth-mode {
+  justify-content: center;
+  padding: 24px;
+}
+
+body.auth-mode nav.tabbar {
+  display: none !important;
+}
+
+body.auth-mode #shell {
+  width: 100%;
+  max-width: 460px;
+  min-height: auto;
+  margin: auto;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  box-shadow: 0 30px 80px rgba(17, 24, 39, 0.16);
+}
+
+body.auth-mode #shell::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: linear-gradient(90deg, var(--teal), #0b6a59 55%, var(--ink));
+}
+
+body.auth-mode #view-auth {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  padding: 40px 38px 32px;
+}
+
+body.auth-mode .brand { margin-bottom: 28px; }
+body.auth-mode .brand-mark { width: 56px; height: 56px; margin-bottom: 18px; }
+body.auth-mode .brand h1 { font-size: 30px; letter-spacing: -0.02em; }
+body.auth-mode .brand p { font-size: 15px; }
+body.auth-mode .btn-primary { padding: 14px 16px; }
+body.auth-mode .auth-switch { margin-top: 22px; }
+
+@media (min-width: 900px) {
+  body.auth-mode {
+    padding: 40px;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(15, 142, 118, 0.18), transparent 34%),
+      radial-gradient(circle at 82% 88%, rgba(17, 24, 39, 0.12), transparent 32%),
+      var(--paper);
+  }
+
+  body.auth-mode #shell {
+    max-width: 460px;
+    box-shadow: 0 36px 90px rgba(17, 24, 39, 0.18);
+  }
+
+  body.auth-mode .auth-switch {
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  /* App de escritorio: contenido centrado en el espacio libre del menú */
+  body:not(.auth-mode) {
+    padding: 0 0 0 calc(var(--sidebar-width) + 36px);
+    justify-content: center;
+  }
+
+  body:not(.auth-mode) #shell {
+    width: 100%;
+    max-width: 1240px;
+    min-height: 100vh;
+    margin: 0 auto;
+    border-radius: 0;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    box-shadow: none;
+  }
+
+  /* Escanear solo tiene sentido en móvil */
+  nav.tabbar .tab-btn[data-view="scan"] { display: none; }
+
+  header.topbar {
+    padding: 20px 32px 18px;
+  }
+
+  header.topbar .header-brand-mark { display: none; }
+  header.topbar .topbar-eyebrow { display: none; }
+  header.topbar h1 {
+    font-size: 23px;
+    letter-spacing: -0.02em;
+  }
+
+  #view-list,
+  #view-scan,
+  #view-analytics,
+  #view-add,
+  #view-profile,
+  #view-suppliers,
+  #view-machines,
+  #view-orders {
+    width: 100%;
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  #view-list,
+  #view-analytics,
+  #view-orders {
+    padding-top: 28px;
+    padding-bottom: 80px;
+  }
+}
+
+@media (max-width: 420px) {
+  body.auth-mode #view-auth {
+    padding: 34px 24px 28px;
+  }
+
+  body.auth-mode .auth-switch {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  body.auth-mode .auth-switch-sep { display: none; }
+}
+
+.product-machine {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 2px 0 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: #0b6a59;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.product-machine.is-empty {
+  padding: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 500;
 }

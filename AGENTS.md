@@ -202,6 +202,23 @@ en el servidor y no solo en el formulario.
   - Verificado en navegador local con datos simulados: banner, modal con todos
     los usuarios, bloqueo sin responsable, correo informativo con la línea del
     responsable y sin errores de consola.
+- Ajustes de diseño web (03/11/2026):
+  - Pantalla de acceso: `body.auth-mode` oculta el menú lateral y centra una
+    tarjeta de 460 px con borde superior degradado y sombra; `body.booting`
+    evita el parpadeo mientras Supabase resuelve la sesión.
+  - En escritorio el sidebar ya no muestra “Escanear” (sigue en móvil) y las
+    vistas se centran con un máximo de 1080 px.
+  - El topbar muestra el título de la sección con el eyebrow “Stock Impresión”.
+  - Los enlaces del acceso (“¿Olvidaste tu contraseña?” y “¿No tienes
+    cuenta? Regístrate”) quedan en una sola fila con separador, fuera de los
+    formularios: el enlace de recuperación solo aparece en el login y toda la
+    fila se oculta en el formulario de nueva contraseña. Por debajo de 420 px
+    se apilan sin separador.
+  - Cada suministro muestra la máquina en un chip “Máquina · …” (o “Sin
+    máquina”), en las tarjetas de Inventario de móvil y escritorio.
+  - Verificado en navegador: acceso móvil y de escritorio con la fila única,
+    cambio login/registro y recuperación sin errores de consola; `npm run
+    check` y `npm run build` correctos.
 
 ### Pendiente
 
@@ -233,7 +250,8 @@ en el servidor y no solo en el formulario.
 
 ## Siguiente paso
 
-1. Hacer commit + push del responsable de compras por proveedor y publicar.
+1. Hacer commit + push de los ajustes de diseño web y verificar el despliegue
+   (acceso, sidebar sin “Escanear” y chips de máquina).
 2. Asignar un responsable de compras a cada proveedor en producción.
 3. Configurar EmailJS (`{{subject}}`/`{{message}}`), probar en producción un
    pedido real, su conciliación al entrar stock y el cron de recepción parcial.

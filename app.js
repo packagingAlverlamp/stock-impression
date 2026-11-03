@@ -4,6 +4,9 @@
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Evita el salto de diseño mientras Supabase resuelve la sesión.
+document.body.classList.add("booting", "auth-mode");
+
 let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
@@ -145,6 +148,7 @@ $("switch-to-register").addEventListener("click", () => {
   $("form-register").classList.remove("hidden");
   $("switch-to-register-wrap").classList.add("hidden");
   $("switch-to-login-wrap").classList.remove("hidden");
+  setAuthSwitchParts({ forgot: false });
   $("auth-error").classList.add("hidden");
 });
 $("switch-to-login").addEventListener("click", () => {
@@ -152,8 +156,14 @@ $("switch-to-login").addEventListener("click", () => {
   $("form-login").classList.remove("hidden");
   $("switch-to-login-wrap").classList.add("hidden");
   $("switch-to-register-wrap").classList.remove("hidden");
+  setAuthSwitchParts({ forgot: true });
   $("auth-error").classList.add("hidden");
 });
+
+function setAuthSwitchParts({ forgot }) {
+  $("forgot-password-wrap").classList.toggle("hidden", !forgot);
+  $("auth-switch-sep").classList.toggle("hidden", !forgot);
+}
 
 function showAuthError(msg) {
   const el = $("auth-error");
@@ -161,12 +171,23 @@ function showAuthError(msg) {
   el.classList.remove("hidden");
 }
 
+function setAuthMode(enabled) {
+  document.body.classList.toggle("auth-mode", enabled);
+  if (!enabled) document.body.classList.remove("booting");
+}
+
+function finishBoot() {
+  requestAnimationFrame(() => document.body.classList.remove("booting"));
+}
+
 function showLoginForms() {
   $("form-login").classList.remove("hidden");
   $("form-register").classList.add("hidden");
   $("form-reset-password").classList.add("hidden");
+  $("auth-switch-row").classList.remove("hidden");
   $("switch-to-register-wrap").classList.remove("hidden");
   $("switch-to-login-wrap").classList.add("hidden");
+  setAuthSwitchParts({ forgot: true });
   $("auth-error").classList.add("hidden");
 }
 
@@ -174,6 +195,7 @@ function showRecoveryForm() {
   $("form-login").classList.add("hidden");
   $("form-register").classList.add("hidden");
   $("form-reset-password").classList.remove("hidden");
+  $("auth-switch-row").classList.add("hidden");
   $("switch-to-register-wrap").classList.add("hidden");
   $("switch-to-login-wrap").classList.add("hidden");
   $("auth-error").classList.add("hidden");
@@ -287,9 +309,11 @@ $("signout-btn").addEventListener("click", async () => {
 supabaseClient.auth.onAuthStateChange((_event, session) => {
   if (_event === "PASSWORD_RECOVERY") {
     currentUser = session?.user || null;
+    setAuthMode(true);
     $("app").classList.add("hidden");
     $("view-auth").classList.remove("hidden");
     showRecoveryForm();
+    finishBoot();
     return;
   }
 
@@ -298,9 +322,11 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
     enterApp();
   } else {
     currentUser = null;
+    setAuthMode(true);
     $("app").classList.add("hidden");
     $("view-auth").classList.remove("hidden");
     showLoginForms();
+    finishBoot();
   }
 });
 
@@ -311,6 +337,7 @@ function safeRenderInventoryState() {
 }
 
 async function enterApp() {
+  setAuthMode(false);
   $("view-auth").classList.add("hidden");
   $("app").classList.remove("hidden");
   await loadProfile();
@@ -356,7 +383,21 @@ function updateWorkshopTabs(name) {
   });
 }
 
+const VIEW_TITLES = {
+  list: "Inventario",
+  machines: "Taller",
+  add: "Añadir suministro",
+  scan: "Escanear",
+  suppliers: "Proveedores",
+  orders: "Pedidos",
+  analytics: "Análisis",
+  profile: "Perfil",
+};
+
 function updateNavState(name) {
+  const title = $("view-title");
+  if (title) title.textContent = VIEW_TITLES[name] || "Stock Impresión";
+
   document.querySelectorAll(".tab-btn[data-view]").forEach((button) => {
     let active = button.dataset.view === name;
     if (isMobileNav() && button.dataset.view === "machines") {
@@ -2138,6 +2179,10 @@ clearSearchBtn.addEventListener("click", () => {
   searchInput.focus();
 });
 
+function productMachineName(product) {
+  return product?.machine?.name || product?.category || "";
+}
+
 function renderProductList() {
   if (!Array.isArray(allProducts)) return;
 
@@ -2193,10 +2238,12 @@ function renderProductList() {
         .map((p) => {
           const low = isLowStock(p);
           const meta = [p.reference ? `Ref. ${p.reference}` : '', p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
+          const machineName = productMachineName(p);
           return `
             <div class="product-row ${low ? 'low' : ''}" data-id="${p.id}">
               <div class="product-main">
-                <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
+                <h3>${escapeHtml(p.name)}</h3>
+                <p class="product-machine ${machineName ? '' : 'is-empty'}">${escapeHtml(machineName ? `Máquina · ${machineName}` : 'Sin máquina')}</p>
                 <p class="product-meta">${escapeHtml(meta)}</p>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
                   <div class="product-qty-wrap">
@@ -2232,10 +2279,12 @@ function renderProductList() {
       .map((p) => {
         const low = isLowStock(p);
         const meta = [p.reference ? `Ref. ${p.reference}` : '', p.unit, p.location, p.supplier?.name].filter(Boolean).join(' / ');
+        const machineName = productMachineName(p);
         return `
           <div class="product-row ${low ? 'low' : ''}">
             <div class="product-main" data-id="${p.id}">
-              <h3><span class="product-cat">${escapeHtml(p.category || '')}</span> · ${escapeHtml(p.name)}</h3>
+              <h3>${escapeHtml(p.name)}</h3>
+              <p class="product-machine ${machineName ? '' : 'is-empty'}">${escapeHtml(machineName ? `Máquina · ${machineName}` : 'Sin máquina')}</p>
               <p class="product-meta">${escapeHtml(meta)}</p>
               <span class="product-qty ${low ? 'low' : ''}">${p.quantity}</span>
               ${low ? `<span class="low-flag">${getLowStockLabel(p)}</span>` : ''}
