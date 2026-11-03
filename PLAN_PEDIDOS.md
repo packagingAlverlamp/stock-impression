@@ -9,7 +9,14 @@
 > fija el proveedor y los demás se añaden a mano. La recepción es automática al
 > escanear y hay un aviso único de recepción parcial a los 7 días.
 >
-> Fecha: 30/10/2026 · Actualizado: 02/11/2026.
+> **Cambio del 03/11/2026**: el email global de compras se sustituye por un
+> **responsable de compras por proveedor** (`suppliers.purchase_manager_id`).
+> El pedido va al responsable del proveedor y el aviso informativo al resto del
+> equipo, indicando quién es el responsable. Si el proveedor no tiene
+> responsable, el envío queda bloqueado. Las referencias del documento al email
+> global de `app_settings` son históricas.
+>
+> Fecha: 30/10/2026 · Actualizado: 03/11/2026.
 
 ---
 

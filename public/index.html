@@ -251,6 +251,7 @@
               <th>Nombre</th>
               <th>Email</th>
               <th>Teléfono</th>
+              <th>Responsable de compras</th>
               <th></th>
             </tr>
           </thead>
@@ -287,19 +288,19 @@
 
       <section id="orders-panel-new" class="orders-panel">
         <h2 class="section-title">Nuevo pedido</h2>
-        <p class="page-intro">Los pedidos se envían al email de compras. Cada pedido va a un único proveedor.</p>
+        <p class="page-intro">Cada pedido va a un único proveedor y se envía a su responsable de compras.</p>
 
-        <div id="purchase-email-banner" class="purchase-email-banner">
-          <div class="purchase-email-info">
-            <span class="purchase-email-label">Email de compras</span>
-            <strong id="purchase-email-value">—</strong>
+        <div id="purchase-manager-banner" class="purchase-manager-banner">
+          <div class="purchase-manager-info">
+            <span class="purchase-manager-label">Responsable de compras</span>
+            <strong id="purchase-manager-value">Se asigna al elegir proveedor</strong>
           </div>
-          <button type="button" id="edit-purchase-email-btn" class="btn btn-outline">Cambiar</button>
+          <button type="button" id="edit-purchase-manager-btn" class="btn btn-outline hidden">Asignar</button>
         </div>
 
         <div id="order-supplier-lock" class="order-supplier-lock hidden">
           <div class="order-supplier-info">
-            <span class="purchase-email-label">Proveedor del pedido</span>
+            <span class="purchase-manager-label">Proveedor del pedido</span>
             <strong id="order-supplier-name">—</strong>
           </div>
           <button type="button" id="order-clear" class="btn btn-outline">Vaciar pedido</button>
@@ -320,13 +321,13 @@
         <div id="order-cart-empty" class="empty-state order-cart-empty">Marca un suministro de la lista o añádelo a mano.</div>
 
         <div class="field">
-          <label for="order-note">Observaciones para compras</label>
+          <label for="order-note">Observaciones</label>
           <textarea id="order-note" rows="3" placeholder="Plazo, urgencia, referencias alternativas..."></textarea>
         </div>
 
         <div class="order-summary" id="order-summary">0 referencias · 0 unidades</div>
         <button type="button" id="order-save-draft" class="btn btn-outline">Guardar borrador</button>
-        <button type="button" id="order-send" class="btn btn-primary" disabled>Enviar pedido a compras</button>
+        <button type="button" id="order-send" class="btn btn-primary" disabled>Enviar pedido</button>
       </section>
 
       <section id="orders-panel-tracking" class="orders-panel hidden">

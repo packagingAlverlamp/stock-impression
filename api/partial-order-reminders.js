@@ -133,15 +133,9 @@ module.exports = async (req, res) => {
     return res.status(500).json({ ok: false, message: profilesError.message });
   }
 
-  const { data: setting } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'purchase_email')
-    .maybeSingle();
-
   const excluded = new Set(
-    [setting?.value, ...orders.map((order) => order.purchase_email)]
-      .map((email) => String(email || '').trim().toLowerCase())
+    orders
+      .map((order) => String(order.purchase_email || '').trim().toLowerCase())
       .filter(Boolean)
   );
 

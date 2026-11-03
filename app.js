@@ -8,6 +8,7 @@ let currentUser = null;
 let currentProfile = null;
 let allProducts = [];
 let allSuppliers = [];
+let allProfiles = [];
 let allMachines = [];
 let allServiceRequests = [];
 let allServiceRequestEvents = [];
@@ -29,14 +30,10 @@ let scanCooldown = false;
 let allPurchaseOrders = [];
 let allPurchaseOrderItems = [];
 let allPurchaseOrderEvents = [];
-let purchaseEmail = "";
 let orderDraftItems = new Map();
 let orderDraftSupplierId = "";
 let activeOrdersSection = "new";
 let ordersLoaded = false;
-
-// Nombre con el que se saluda en el correo a compras.
-const PURCHASE_CONTACT_NAME = "Olga";
 
 const BARCODE_FORMATS = window.Html5QrcodeSupportedFormats
   ? [
@@ -317,6 +314,7 @@ async function enterApp() {
   $("view-auth").classList.add("hidden");
   $("app").classList.remove("hidden");
   await loadProfile();
+  await loadProfiles();
   await loadSuppliers();
   await loadMachines();
   await loadProducts();
@@ -500,6 +498,23 @@ async function loadProfile() {
   if (!error) currentProfile = data;
 }
 
+async function loadProfiles() {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, email")
+    .order("email", { ascending: true });
+
+  if (error) {
+    console.warn("No se pudieron cargar los usuarios:", error);
+    allProfiles = [];
+    return;
+  }
+
+  allProfiles = (data || []).filter((profile) =>
+    /^[^\s@]+@alverlamp\.es$/i.test(profile.email || "")
+  );
+}
+
 function renderProfile() {
   if (!currentProfile) return;
   $("profile-email").textContent = currentProfile.email;
@@ -582,7 +597,7 @@ $("delete-account-btn").addEventListener("click", async () => {
 async function loadSuppliers() {
   const { data, error } = await supabaseClient
     .from("suppliers")
-    .select("*")
+    .select("*, purchase_manager:profiles!suppliers_purchase_manager_id_fkey(id, email)")
     .order("name", { ascending: true, nullsFirst: false });
 
   if (error) {
@@ -960,7 +975,7 @@ function renderSuppliersTable() {
   if (!allSuppliers.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="4" class="table-empty-cell">Todavía no hay proveedores guardados.</td>
+        <td colspan="5" class="table-empty-cell">Todavía no hay proveedores guardados.</td>
       </tr>
     `;
     return;
@@ -978,6 +993,7 @@ function renderSuppliersTable() {
           <td class="supplier-name-cell">${escapeHtml(supplier.name || "—")}</td>
           <td data-label="Email">${escapeHtml(emails.length ? emails.join("; ") : "—")}</td>
           <td data-label="Teléfono">${escapeHtml(supplier.phone || "—")}</td>
+          <td data-label="Responsable de compras">${escapeHtml(supplier.purchase_manager?.email || "Sin asignar")}</td>
           <td class="supplier-actions" data-label="Acciones">
             <button type="button" class="btn btn-outline supplier-edit-btn" data-supplier-id="${supplier.id}" aria-label="Editar proveedor" title="Editar proveedor">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 4 4 4M4 20l4-1 12-12a2.12 2.12 0 0 0-3-3L5 16l-1 4Z"/></svg>
@@ -1041,6 +1057,14 @@ function openSupplierModal(supplier = null) {
           <label for="supplier-phone">Teléfono</label>
           <input type="tel" id="supplier-phone" value="${escapeHtml(supplier?.phone || "")}" placeholder="Ej: 612 345 678" />
         </div>
+        <div class="field">
+          <label for="supplier-manager">Responsable de compras</label>
+          <select id="supplier-manager">
+            <option value="">Sin responsable</option>
+            ${allProfiles.map((profile) => `<option value="${escapeHtml(profile.id)}" ${supplier?.purchase_manager_id === profile.id ? "selected" : ""}>${escapeHtml(profile.email)}</option>`).join("")}
+          </select>
+          <small class="field-hint">Recibirá los pedidos de este proveedor. Necesario para poder enviarlos.</small>
+        </div>
         <button type="submit" class="btn btn-primary">${supplier ? "Guardar cambios" : "Guardar proveedor"}</button>
       </form>
     </div>
@@ -1059,6 +1083,7 @@ function openSupplierModal(supplier = null) {
     const name = $("supplier-name").value.trim();
     const email = $("supplier-email").value.trim();
     const phone = $("supplier-phone").value.trim();
+    const purchaseManagerId = $("supplier-manager").value || null;
 
     if (!name && !email && !phone) {
       showToast("Rellena al menos un dato del proveedor.");
@@ -1069,6 +1094,7 @@ function openSupplierModal(supplier = null) {
       name: name || null,
       email: email || null,
       phone: phone || null,
+      purchase_manager_id: purchaseManagerId,
     };
 
     const submit = backdrop.querySelector('button[type="submit"]');
@@ -1085,6 +1111,8 @@ function openSupplierModal(supplier = null) {
         close();
         await loadSuppliers();
         await loadProducts();
+        renderOrderPicker();
+        renderOrderCart();
         showToast(supplier ? "Proveedor actualizado" : "Proveedor guardado");
       } catch (error) {
         showToast("No se pudo guardar el proveedor: " + error.message);
@@ -2561,85 +2589,36 @@ function getOrderPendingUnits(orderId) {
     .reduce((sum, item) => sum + Math.max(0, Number(item.quantity_requested) - Number(item.quantity_received)), 0);
 }
 
-// ---------- Ajustes: email de compras ----------
-async function loadPurchaseEmail() {
-  const { data, error } = await supabaseClient
-    .from("app_settings")
-    .select("value")
-    .eq("key", "purchase_email")
-    .maybeSingle();
+// ---------- Responsable de compras por proveedor ----------
+function getOrderPurchaseManager() {
+  const supplier = getOrderSupplier();
+  return supplier?.purchase_manager || null;
+}
 
-  if (error) {
-    console.warn("No se pudo cargar el email de compras:", error);
-    purchaseEmail = "";
-  } else {
-    purchaseEmail = (data?.value || "").trim();
+function getOrderPurchaseEmail() {
+  return (getOrderPurchaseManager()?.email || "").trim();
+}
+
+function renderPurchaseManagerBanner() {
+  const banner = $("purchase-manager-banner");
+  const value = $("purchase-manager-value");
+  const button = $("edit-purchase-manager-btn");
+  if (!banner || !value || !button) return;
+
+  const supplier = getOrderSupplier();
+  const manager = getOrderPurchaseManager();
+
+  if (!supplier) {
+    value.textContent = "Se asigna al elegir proveedor";
+    banner.classList.remove("is-missing");
+    button.classList.add("hidden");
+    return;
   }
-  renderPurchaseEmailBanner();
-}
 
-function renderPurchaseEmailBanner() {
-  const value = $("purchase-email-value");
-  if (!value) return;
-  const banner = $("purchase-email-banner");
-  value.textContent = purchaseEmail || "Sin configurar";
-  banner.classList.toggle("is-missing", !purchaseEmail);
-  updateOrderSummary();
-}
-
-function openPurchaseEmailModal() {
-  if (hasOpenModal()) return;
-
-  const backdrop = document.createElement("div");
-  backdrop.className = "modal-backdrop centered";
-  backdrop.innerHTML = `
-    <div class="modal-sheet">
-      <div class="modal-header">
-        <h2>Email de compras</h2>
-        <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
-      </div>
-      <form id="purchase-email-form">
-        <div class="field">
-          <label for="purchase-email-input">Email de compras *</label>
-          <input type="email" id="purchase-email-input" required value="${escapeHtml(purchaseEmail)}" placeholder="compras@alverlamp.es" />
-          <small class="field-hint">Solo se permiten direcciones @alverlamp.es.</small>
-        </div>
-        <button type="submit" class="btn btn-primary">Guardar</button>
-      </form>
-    </div>`;
-  document.body.appendChild(backdrop);
-
-  const close = () => backdrop.remove();
-  backdrop.querySelector(".modal-close").addEventListener("click", close);
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) close();
-  });
-
-  backdrop.querySelector("#purchase-email-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const input = $("purchase-email-input");
-    const value = input.value.trim();
-    if (!/^[^\s@]+@alverlamp\.es$/i.test(value)) {
-      showToast("El email de compras debe terminar en @alverlamp.es");
-      input.focus();
-      return;
-    }
-
-    const submit = backdrop.querySelector('button[type="submit"]');
-    await withBusy(submit, "Guardando…", async () => {
-      const { error } = await supabaseClient
-        .from("app_settings")
-        .upsert({ key: "purchase_email", value, updated_by: currentUser?.id || null }, { onConflict: "key" });
-      if (error) {
-        showToast("No se pudo guardar el email de compras: " + error.message, 6000);
-        return;
-      }
-      purchaseEmail = value;
-      renderPurchaseEmailBanner();
-      close();
-      showToast("Email de compras actualizado");
-    });
-  });
+  value.textContent = manager?.email || `Sin responsable · ${supplier.name || "proveedor"}`;
+  banner.classList.toggle("is-missing", !manager);
+  button.classList.remove("hidden");
+  button.textContent = manager ? "Cambiar" : "Asignar";
 }
 
 // ---------- Vista de pedidos ----------
@@ -2669,7 +2648,6 @@ async function openOrdersView() {
     }
   }
 
-  await loadPurchaseEmail();
   await loadOrders();
   renderOrderPicker();
   renderOrderCart();
@@ -2778,6 +2756,7 @@ function renderOrderPicker() {
   if (!container) return;
 
   renderOrderSupplierLock();
+  renderPurchaseManagerBanner();
 
   const supplier = getOrderSupplier();
   const lowProducts = allProducts
@@ -2989,13 +2968,14 @@ function updateOrderSummary() {
   summary.textContent = `${orderDraftItems.size} ${orderDraftItems.size === 1 ? "referencia" : "referencias"} · ${formatStockNumber(totalUnits)} ${totalUnits === 1 ? "unidad" : "unidades"}`;
 
   const supplier = getOrderSupplier();
-  const blocked = !purchaseEmail || !supplier || orderDraftItems.size === 0;
+  const manager = getOrderPurchaseManager();
+  const blocked = !supplier || !manager || orderDraftItems.size === 0;
   sendButton.disabled = blocked;
   sendButton.title = blocked
-    ? (!purchaseEmail
-      ? "Configura el email de compras"
-      : !supplier
-        ? "Añade un suministro para fijar el proveedor"
+    ? (!supplier
+      ? "Añade un suministro para fijar el proveedor"
+      : !manager
+        ? "Asigna un responsable de compras al proveedor"
         : "Añade al menos un suministro")
     : "";
 }
@@ -3011,6 +2991,8 @@ function resetOrderDraft() {
 
 async function submitPurchaseOrder(asDraft) {
   const supplier = getOrderSupplier();
+  const purchaseManager = getOrderPurchaseManager();
+  const purchaseEmail = (purchaseManager?.email || "").trim();
   const note = $("order-note").value.trim();
   const entries = [...orderDraftItems.entries()]
     .map(([productId, quantity]) => ({
@@ -3019,12 +3001,12 @@ async function submitPurchaseOrder(asDraft) {
     }))
     .filter((entry) => entry.product);
 
-  if (!purchaseEmail) {
-    showToast("Configura el email de compras antes de enviar pedidos.");
-    return;
-  }
   if (!supplier) {
     showToast("Añade un suministro para fijar el proveedor del pedido.");
+    return;
+  }
+  if (!purchaseEmail) {
+    showToast("Asigna un responsable de compras al proveedor antes de enviar el pedido.");
     return;
   }
   if (!entries.length) {
@@ -3100,7 +3082,7 @@ async function submitPurchaseOrder(asDraft) {
       if (updateError) {
         showToast(`Los correos se enviaron, pero no se pudo actualizar el pedido: ${updateError.message}`, 8000);
       } else {
-        showToast(`Pedido ${formatOrderNumber(order)} enviado a compras`, 5000);
+        showToast(`Pedido ${formatOrderNumber(order)} enviado a ${purchaseEmail}`, 5000);
       }
 
       resetOrderDraft();
@@ -3113,16 +3095,22 @@ async function submitPurchaseOrder(asDraft) {
 }
 
 // ---------- Correos ----------
-async function getTeamEmails() {
+async function getTeamEmails({ exclude = [] } = {}) {
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("email")
-    .eq("notify_low_stock", true);
+    .select("email");
   if (error) throw new Error("No se pudo obtener el equipo destinatario: " + error.message);
+
+  const excluded = new Set(
+    (exclude || [])
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   return [...new Set((data || [])
     .map((profile) => (profile.email || "").trim())
-    .filter((email) => email && /^[^\s@]+@alverlamp\.es$/i.test(email)))];
+    .filter((email) => email && /^[^\s@]+@alverlamp\.es$/i.test(email))
+    .filter((email) => !excluded.has(email.toLowerCase())))];
 }
 
 async function sendEmailMessage({ recipients, subject, text, html, variables = {} }) {
@@ -3180,7 +3168,7 @@ function buildPurchaseOrderText(order, items) {
 
   const total = items.reduce((sum, item) => sum + Number(item.quantity_requested || 0), 0);
   const lines = [
-    `Hola ${PURCHASE_CONTACT_NAME},`,
+    "Hola,",
     "Necesitamos estos suministros para la sala de impresión:",
     "",
     ...supplierLines,
@@ -3212,7 +3200,7 @@ function buildPurchaseOrderHtml(order, items) {
 
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;">
-      <p>Hola ${escapeHtml(PURCHASE_CONTACT_NAME)},</p>
+      <p>Hola,</p>
       <p>Necesitamos estos suministros para la sala de impresión:</p>
       <p style="margin:18px 0 6px;"><strong>PROVEEDOR</strong></p>
       <p style="margin:0;">Nombre: ${escapeHtml(order.supplier_name || "Sin nombre")}</p>
@@ -3249,7 +3237,7 @@ function buildTeamOrderText(order, items) {
     "",
     `Pedido: ${formatOrderNumber(order)}`,
     `Proveedor: ${order.supplier_name}`,
-    `Destinatario: ${order.purchase_email}`,
+    `Responsable de compras: ${order.purchase_email || "Sin asignar"}`,
     `Líneas: ${items.length} (${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"})`,
     `Solicitado por: ${order.requested_by_email || ""}`,
     "",
@@ -3271,7 +3259,7 @@ function buildTeamOrderHtml(order, items) {
       <p>
         <strong>Pedido:</strong> ${escapeHtml(formatOrderNumber(order))}<br />
         <strong>Proveedor:</strong> ${escapeHtml(order.supplier_name)}<br />
-        <strong>Destinatario:</strong> ${escapeHtml(order.purchase_email)}<br />
+        <strong>Responsable de compras:</strong> ${escapeHtml(order.purchase_email || "Sin asignar")}<br />
         <strong>Líneas:</strong> ${items.length} (${formatStockNumber(total)} ${total === 1 ? "unidad" : "unidades"})<br />
         <strong>Solicitado por:</strong> ${escapeHtml(order.requested_by_email || "")}
       </p>
@@ -3281,18 +3269,24 @@ function buildTeamOrderHtml(order, items) {
 }
 
 async function sendPurchaseOrderEmails(order, items) {
-  const teamEmails = await getTeamEmails();
-  if (!teamEmails.length) throw new Error("No hay destinatarios del equipo con avisos activos.");
+  const purchaseEmail = (order.purchase_email || "").trim();
+  if (!purchaseEmail) {
+    throw new Error("El proveedor no tiene responsable de compras asignado.");
+  }
+
+  const teamEmails = await getTeamEmails({ exclude: [purchaseEmail] });
+  if (!teamEmails.length) throw new Error("No hay otros usuarios del equipo a los que avisar.");
 
   const variables = {
     order_number: formatOrderNumber(order),
     supplier_name: order.supplier_name,
-    purchase_email: order.purchase_email,
+    purchase_email: purchaseEmail,
+    purchase_manager: purchaseEmail,
     line_count: items.length,
   };
 
   await sendEmailMessage({
-    recipients: [order.purchase_email],
+    recipients: [purchaseEmail],
     subject: `Pedido de suministros para marketing · ${order.supplier_name}`,
     text: buildPurchaseOrderText(order, items),
     html: buildPurchaseOrderHtml(order, items),
@@ -3420,8 +3414,8 @@ function openOrderDetailModal(orderId) {
           <strong>${escapeHtml(order.requested_by_email || "—")}</strong>
         </div>
         <div class="order-detail-block">
-          <span>Email de compras</span>
-          <strong>${escapeHtml(order.purchase_email)}</strong>
+          <span>Responsable de compras</span>
+          <strong>${escapeHtml(order.purchase_email || "Sin asignar")}</strong>
         </div>
       </div>
 
@@ -3612,7 +3606,7 @@ async function resendPurchaseOrder(order, items, button) {
         .update({ status: "sent", sent_at: order.sent_at || now, emails_sent: true, emails_sent_at: now })
         .eq("id", order.id);
       if (error) throw error;
-      showToast(`Pedido ${formatOrderNumber(order)} enviado a compras`, 5000);
+      showToast(`Pedido ${formatOrderNumber(order)} enviado a ${order.purchase_email}`, 5000);
       const backdrop = document.querySelector(".modal-backdrop");
       if (backdrop) backdrop.remove();
       await loadOrders();
@@ -3679,7 +3673,14 @@ document.querySelectorAll(".orders-view-btn").forEach((button) => {
   button.addEventListener("click", () => showOrdersSection(button.dataset.ordersView));
 });
 
-$("edit-purchase-email-btn").addEventListener("click", openPurchaseEmailModal);
+$("edit-purchase-manager-btn").addEventListener("click", () => {
+  const supplier = getOrderSupplier();
+  if (!supplier) {
+    showToast("Añade un suministro para fijar el proveedor del pedido.");
+    return;
+  }
+  openSupplierModal(supplier);
+});
 
 $("order-clear").addEventListener("click", () => {
   if (!orderDraftItems.size) return;

@@ -139,10 +139,12 @@ realidad archiva.
 - Un pedido por proveedor, con los suministros de poco stock como punto de
   partida. Al marcar el primero se fija el proveedor y el resto se añade a mano.
 - Recepción automática al escanear; si queda parte pendiente, aviso único al
-  equipo a los 7 días (sin incluir a compras).
-- Email de compras configurable (`@alverlamp.es`) y validado en base de datos.
-- Correo al email de compras con referencia, EAN, cantidad y datos del
-  proveedor, más aviso al equipo con asunto “Pedido realizado a compras”.
+  equipo a los 7 días (sin incluir al responsable de compras del pedido).
+- Responsable de compras por proveedor, elegido entre los usuarios
+  `@alverlamp.es`; sin responsable no se puede enviar el pedido.
+- Correo al responsable con referencia, EAN, cantidad y datos del proveedor,
+  más aviso al resto del equipo con asunto “Pedido realizado a compras” e
+  indicación del responsable.
 - Seguimiento con estados, historial y detalle por línea.
 - Conciliación automática: al entrar stock, se descuenta del pedido pendiente.
 - Referencia de proveedor en la ficha de producto.

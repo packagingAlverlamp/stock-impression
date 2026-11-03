@@ -1016,3 +1016,14 @@ end;
 $$;
 
 grant execute on function public.set_purchase_order_item_received(uuid, numeric) to authenticated;
+
+-- ============================================================
+-- RESPONSABLE DE COMPRAS POR PROVEEDOR
+-- (equivalente a la migración 20261103120000_supplier_purchase_manager.sql)
+-- ============================================================
+alter table public.suppliers
+  add column if not exists purchase_manager_id uuid
+    references public.profiles(id) on delete set null;
+
+create index if not exists suppliers_purchase_manager_idx
+  on public.suppliers (purchase_manager_id);

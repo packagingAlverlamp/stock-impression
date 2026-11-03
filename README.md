@@ -95,8 +95,8 @@ automáticamente los permisos necesarios en la función.
    y añade:
    - `TEAM_EMAILS`: los emails del equipo separados por comas. Es
      **obligatorio**: el script solo envía a direcciones que estén en esta
-     lista. Incluye el email de compras (por ejemplo `compras@alverlamp.es`)
-     y a todas las personas que deban recibir avisos, también los de pedidos.
+     lista. Incluye a todas las personas que puedan ser responsables de
+     compras y a quienes deban recibir avisos, también los de pedidos.
    - `MAX_EMAILS_PER_HOUR` (opcional): límite de envíos por hora. Por
      defecto 60.
 6. Pulsa **Implementar**. Google te pedirá autorizar permisos (enviar
@@ -200,21 +200,28 @@ genera solo, sin coste.
   `supabase db push`. Añade el campo `products.reference`, la tabla de ajustes
   `app_settings`, los pedidos (`purchase_orders`, `purchase_order_items`,
   `purchase_order_events`), la numeración `PED-0001`, el historial de estados y
-  la conciliación automática de stock. El email de compras se guarda en
-  **Pedidos → Cambiar** (clave `purchase_email` de `app_settings`) y la base de
-  datos exige que termine en `@alverlamp.es`. En **Nuevo pedido** se muestran
-  primero los suministros con poco stock; al marcar el primero se fija el
-  proveedor y solo se pueden añadir suministros suyos. Los que no están bajo
-  mínimo se añaden con **Añadir otro suministro**. Cuando entra stock de un
-  producto con líneas pendientes, el trigger descuenta las unidades del pedido
-  más antiguo y marca la línea como recibida al completarse; las recepciones
-  parciales dejan el pedido en `partial`. Desde el detalle se puede corregir la
-  cantidad recibida o forzar la recepción total.
+  la conciliación automática de stock. El **responsable de compras** se elige
+  por proveedor en **Taller → Proveedores** (columna
+  `suppliers.purchase_manager_id`, apuntando a `profiles`) y el pedido se envía
+  a su email. En **Nuevo pedido** se muestran primero los suministros con poco
+  stock; al marcar el primero se fija el proveedor y solo se pueden añadir
+  suministros suyos. Los que no están bajo mínimo se añaden con **Añadir otro
+  suministro**. Si el proveedor no tiene responsable, el envío queda bloqueado
+  hasta asignarlo. Cuando entra stock de un producto con líneas pendientes, el
+  trigger descuenta las unidades del pedido más antiguo y marca la línea como
+  recibida al completarse; las recepciones parciales dejan el pedido en
+  `partial`. Desde el detalle se puede corregir la cantidad recibida o forzar
+  la recepción total.
+- **Responsable de compras por proveedor**: aplica
+  `supabase/migrations/20261103120000_supplier_purchase_manager.sql`. Añade
+  `suppliers.purchase_manager_id` con `on delete set null`. El correo del
+  pedido va al responsable del proveedor y el aviso informativo al resto de
+  usuarios `@alverlamp.es`, indicando quién es el responsable de ese pedido.
 - **Aviso de recepción parcial**: aplica
   `supabase/migrations/20261102130000_partial_order_reminders.sql`. Guarda la
   primera recepción y la fecha del aviso. Un cron diario envía un único correo
-  a todo el equipo `@alverlamp.es` (excepto compras) cuando un pedido lleva 7
-  días en estado parcial.
+  a todo el equipo `@alverlamp.es` (excepto el responsable de compras del
+  pedido) cuando un pedido lleva 7 días en estado parcial.
 
 - **Privacidad interna**: al ser un inventario compartido, cualquier
   persona registrada puede ver el email de las demás (es necesario para
@@ -311,7 +318,8 @@ curl -X POST https://stock-impresion.vercel.app/api/send-email \
        cuerpo `{{message}}`. Si la plantilla tiene un asunto fijo, el aviso al
        equipo no llevará el asunto exigido “Pedido realizado a compras”.
      - Variables adicionales de pedidos: `order_number`, `supplier_name`,
-       `purchase_email` y `line_count`.
+       `purchase_email` (responsable del proveedor), `purchase_manager` y
+       `line_count`.
   3. En Vercel (Project → Settings → Environment Variables) añade:
      - `EMAILJS_SERVICE_ID` — ID del Service.
      - `EMAILJS_TEMPLATE_ID` — ID de la plantilla.
@@ -333,8 +341,8 @@ Vercel ejecuta dos tareas programadas. Ambas necesitan la variable
 - **Todos los días a las 09:00 UTC**: aviso de pedidos recibidos parcialmente
   (`/api/partial-order-reminders.js`). Si un pedido lleva 7 días en estado
   `partial` desde la primera recepción, envía un único correo a todos los
-  usuarios `@alverlamp.es` excepto el email de compras. Después guarda
-  `partial_notified_at` para no repetirlo.
+  usuarios `@alverlamp.es` excepto el responsable de compras de ese pedido.
+  Después guarda `partial_notified_at` para no repetirlo.
 
 Además de `CRON_SECRET`, los dos endpoints necesitan
 `SUPABASE_SERVICE_ROLE_KEY`, `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`,

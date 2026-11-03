@@ -2,7 +2,7 @@
 
 > Instrucción permanente: **responder siempre en castellano**.
 >
-> Última actualización: 02/11/2026.
+> Última actualización: 03/11/2026.
 
 ## Objetivo
 
@@ -65,10 +65,15 @@ en el servidor y no solo en el formulario.
   firmadas en el correo. El Apps Script y SendGrid las adjuntan; EmailJS
   incluye enlaces y variables `photo_1`…`photo_3` para adjuntos variables.
 - Pedidos implementado (02/11/2026) según `PLAN_PEDIDOS.md`:
-  - Un pedido = un proveedor; el correo va al **email de compras**, no al
-    proveedor, con sus datos en el cuerpo.
-  - Email de compras global en `app_settings` (`purchase_email`), validado con
-    CHECK de dominio `@alverlamp.es` en base de datos.
+  - Un pedido = un proveedor; el correo va a su **responsable de compras**, no
+    al proveedor, con los datos del proveedor en el cuerpo.
+  - El responsable de compras se elige por proveedor en
+    `suppliers.purchase_manager_id` (FK a `profiles`, `on delete set null`) y se
+    guarda desde el modal de proveedor. Si falta, no se puede enviar el pedido.
+  - `purchase_orders.purchase_email` conserva el email del responsable elegido
+    como copia histórica, aunque después cambie.
+  - El email global de `app_settings` (`purchase_email`) queda obsoleto en la
+    interfaz; la tabla y su CHECK de dominio se conservan.
   - Tablas `purchase_orders`, `purchase_order_items` y
     `purchase_order_events`, con copias históricas de nombre, referencia, EAN,
     unidad y datos del proveedor.
@@ -76,9 +81,9 @@ en el servidor y no solo en el formulario.
   - Conciliación automática mediante trigger sobre `stock_movements` de tipo
     `entry`, FIFO por pedido más antiguo; las recepciones parciales dejan la
     línea en `partial`.
-  - Dos correos: pedido a compras y aviso al equipo con asunto exacto
-    “Pedido realizado a compras”. El saludo a compras usa
-    `PURCHASE_CONTACT_NAME = "Olga"` en `app.js`.
+  - Dos correos: pedido al responsable del proveedor y aviso al resto del
+    equipo con asunto exacto “Pedido realizado a compras”. El aviso indica
+    quién es el responsable de compras de ese pedido. El saludo es “Hola,”.
   - El flujo de Nuevo pedido se invirtió el 02/11/2026: primero se muestran los
     suministros con poco stock de todos los proveedores; al marcar el primero se
     fija el proveedor y la lista y el buscador manual se limitan a ese
@@ -88,7 +93,8 @@ en el servidor y no solo en el formulario.
     ajustes manuales quedan como corrección.
   - Aviso de recepción parcial: pasados 7 días desde la primera recepción, un
     cron diario envía un único correo a todos los usuarios `@alverlamp.es`
-    excepto el email de compras, y guarda `partial_notified_at`.
+    excepto el responsable de compras de ese pedido, y guarda
+    `partial_notified_at`.
   - La referencia se añadió a `products.reference` y se muestra en tarjeta,
     búsqueda y correos.
   - Los selects Máquina/Proveedor quedan a 46 px con `appearance: none` y
@@ -155,17 +161,15 @@ en el servidor y no solo en el formulario.
     se fija el proveedor y solo se pueden añadir suministros suyos. El resto se
     añade con “Añadir otro suministro”. Incluye carrito, observaciones,
     borrador y envío.
-  - Email de compras editable desde la propia vista y validado en formulario y
-    base de datos.
-  - Correos con el copy acordado: pedido a compras y aviso al equipo con
-    asunto “Pedido realizado a compras”.
+  - Correos con el copy acordado: pedido al responsable del proveedor y aviso
+    al equipo con asunto “Pedido realizado a compras”.
   - Seguimiento con contadores, filtros, búsqueda, detalle por línea,
     historial, reenvío, cancelación y recepción total o parcial.
   - “Recibido” se marca solo al entrar stock o al escanear el suministro; el
     trigger concilia la entrada con el pedido abierto más antiguo.
   - Aviso único de recepción parcial: un cron diario envía a todos los usuarios
-    `@alverlamp.es` excepto compras cuando un pedido lleva 7 días en estado
-    `partial` desde la primera recepción.
+    `@alverlamp.es` excepto el responsable del pedido cuando lleva 7 días en
+    estado `partial` desde la primera recepción.
   - Conciliación visible al entrar stock desde el stepper, el escaneo o la
     ficha: muestra qué pedido y cuántas unidades se han conciliado.
   - Campo Referencia en alta, edición, tarjeta y búsqueda.
@@ -177,6 +181,27 @@ en el servidor y no solo en el formulario.
   - Verificado en navegador local con datos simulados: sin errores de consola,
     picker y carrito (2 referencias · 5 unidades), lista de seguimiento y modal
     de detalle.
+- Responsable de compras por proveedor (03/11/2026):
+  - Migración `20261103120000_supplier_purchase_manager.sql` creada y aplicada
+    en remoto: `suppliers.purchase_manager_id` con FK a `profiles` y
+    `on delete set null`, más índice.
+  - `loadProfiles()` carga los usuarios `@alverlamp.es` y el modal de proveedor
+    añade el desplegable “Responsable de compras”. La tabla de proveedores
+    muestra la columna y la búsqueda de pedidos no cambia.
+  - El banner de **Nuevo pedido** muestra el responsable del proveedor fijado,
+    con botón “Asignar/Cambiar” que abre el modal del proveedor. Si falta, el
+    envío queda bloqueado con el aviso correspondiente.
+  - `submitPurchaseOrder()` guarda el email del responsable en
+    `purchase_orders.purchase_email` y bloquea el envío si no hay responsable.
+  - `sendPurchaseOrderEmails()` envía el pedido al responsable y el aviso al
+    resto de usuarios `@alverlamp.es` (todos, sin depender de
+    `notify_low_stock`), excluyendo al responsable. El aviso incluye
+    “Responsable de compras: …”.
+  - `api/partial-order-reminders.js` excluye ahora solo el `purchase_email` de
+    cada pedido (ya no lee `app_settings`).
+  - Verificado en navegador local con datos simulados: banner, modal con todos
+    los usuarios, bloqueo sin responsable, correo informativo con la línea del
+    responsable y sin errores de consola.
 
 ### Pendiente
 
@@ -186,8 +211,11 @@ en el servidor y no solo en el formulario.
 - Probar el flujo completo de registro con confirmación por email y el enlace
   de vuelta a la web.
 - Configurar en la plantilla de EmailJS el asunto `{{subject}}` y el cuerpo
-  `{{message}}` para que el aviso lleve el asunto exigido; añadir
-  `compras@alverlamp.es` a `TEAM_EMAILS` si se usa Apps Script.
+  `{{message}}` para que el aviso lleve el asunto exigido; añadir a
+  `TEAM_EMAILS` a todos los posibles responsables de compras si se usa Apps
+  Script.
+- Asignar responsable de compras a cada proveedor en producción antes de
+  enviar pedidos nuevos.
 - Probar en producción un pedido real con EmailJS y una entrada de stock que
   concilie la línea y marque “Recibido”.
 - Probar el cron de recepción parcial (`/api/partial-order-reminders.js`) con
@@ -205,16 +233,16 @@ en el servidor y no solo en el formulario.
 
 ## Siguiente paso
 
-1. Revisar el cambio de Pedidos y hacer commit + push a `origin/main` cuando el
-   usuario lo confirme.
-2. Configurar EmailJS (`{{subject}}`/`{{message}}`), probar en producción un
+1. Hacer commit + push del responsable de compras por proveedor y publicar.
+2. Asignar un responsable de compras a cada proveedor en producción.
+3. Configurar EmailJS (`{{subject}}`/`{{message}}`), probar en producción un
    pedido real, su conciliación al entrar stock y el cron de recepción parcial.
-3. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
+4. Probar el registro con un email `@alverlamp.es`, confirmar el correo y
    comprobar que el enlace devuelve a la web con la sesión iniciada.
-4. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
-5. Probar una solicitud de servicio técnico completa con fotos desde una
+5. Decidir el tema del SMTP antes de dar de alta empleados nuevos.
+6. Probar una solicitud de servicio técnico completa con fotos desde una
    cuenta real y revisar el correo recibido.
-6. Crear y aplicar una migración posterior para eliminar `products.category`.
+7. Crear y aplicar una migración posterior para eliminar `products.category`.
 
 ## Ficheros relevantes
 
@@ -247,6 +275,8 @@ en el servidor y no solo en el formulario.
 - `supabase/migrations/20261102130000_partial_order_reminders.sql`: primera
   recepción, aviso único y ajuste de las funciones de conciliación; aplicada en
   remoto.
+- `supabase/migrations/20261103120000_supplier_purchase_manager.sql`:
+  responsable de compras por proveedor; aplicada en remoto.
 - `api/partial-order-reminders.js`: cron diario que avisa al equipo de pedidos
   parciales con 7 días.
 - `README.md`: instalación, seguridad, desarrollo local y despliegue.
@@ -262,8 +292,8 @@ en el servidor y no solo en el formulario.
 
 - Supabase CLI está instalado y conectado al proyecto remoto.
 - Migraciones aplicadas en remoto: `20261001000000`, `20261008130000`,
-  `20261026110000`, `20261029120000`, `20261030120000`, `20261102120000` y
-  `20261102130000`.
+  `20261026110000`, `20261029120000`, `20261030120000`, `20261102120000`,
+  `20261102130000` y `20261103120000`.
 - No quedan migraciones pendientes en remoto.
 - URL de producción: `https://stock-impresion.vercel.app`.
 - La configuración de producción usa `APPS_SCRIPT_URL=""` y EmailJS. El
@@ -272,9 +302,11 @@ en el servidor y no solo en el formulario.
   EmailJS hay que configurar adjuntos variables en la plantilla.
 - La plantilla de EmailJS debe usar `{{subject}}` como asunto y `{{message}}`
   como cuerpo; si no, el aviso al equipo no llevará “Pedido realizado a
-  compras”. El email de compras (`compras@alverlamp.es` por defecto) debe
-  estar en `TEAM_EMAILS` si se usa Apps Script, porque el script solo envía a
-  esa lista blanca.
+  compras”. Si se usa Apps Script, todos los posibles responsables de compras
+  deben estar en `TEAM_EMAILS`, porque el script solo envía a esa lista blanca.
+- El destinatario del pedido sale de `suppliers.purchase_manager_id`; un
+  proveedor sin responsable bloquea el envío. `purchase_orders.purchase_email`
+  guarda el email usado en cada pedido.
 - Vercel ejecuta dos crons: resumen semanal de stock bajo (lunes) y aviso de
   pedidos parciales (diario a las 09:00 UTC). Ambos requieren `CRON_SECRET`,
   `SUPABASE_SERVICE_ROLE_KEY` y `EMAILJS_PRIVATE_KEY`; el plan Hobby permite
