@@ -383,21 +383,7 @@ function updateWorkshopTabs(name) {
   });
 }
 
-const VIEW_TITLES = {
-  list: "Inventario",
-  machines: "Taller",
-  add: "Añadir suministro",
-  scan: "Escanear",
-  suppliers: "Proveedores",
-  orders: "Pedidos",
-  analytics: "Análisis",
-  profile: "Perfil",
-};
-
 function updateNavState(name) {
-  const title = $("view-title");
-  if (title) title.textContent = VIEW_TITLES[name] || "Stock Impresión";
-
   document.querySelectorAll(".tab-btn[data-view]").forEach((button) => {
     let active = button.dataset.view === name;
     if (isMobileNav() && button.dataset.view === "machines") {
@@ -2183,6 +2169,12 @@ function productMachineName(product) {
   return product?.machine?.name || product?.category || "";
 }
 
+function machineChipMarkup(product) {
+  const machineName = productMachineName(product);
+  const label = machineName ? `Máquina · ${machineName}` : "Sin máquina";
+  return `<span class="product-machine ${machineName ? "" : "is-empty"}">${escapeHtml(label)}</span>`;
+}
+
 function renderProductList() {
   if (!Array.isArray(allProducts)) return;
 
@@ -2843,6 +2835,7 @@ function renderOrderPicker() {
         <input type="checkbox" class="order-low-check" data-product-id="${product.id}" data-suggested="${getProductSuggestedQuantity(product)}" ${selected ? "checked" : ""} ${missingSupplier ? "disabled" : ""} />
         <span class="order-picker-main">
           <strong>${escapeHtml(product.name)}</strong>
+          ${machineChipMarkup(product)}
           <span class="order-picker-meta">${escapeHtml(orderProductMeta(product))}</span>
           ${note}
         </span>
@@ -2934,6 +2927,7 @@ function openOrderProductModal() {
         <div class="order-picker-row ${added ? "is-selected" : ""} ${missingSupplier ? "is-disabled" : ""}">
           <div class="order-picker-main">
             <strong>${escapeHtml(product.name)}</strong>
+            ${machineChipMarkup(product)}
             <span class="order-picker-meta">${escapeHtml(orderProductMeta(product))}</span>
             <span class="order-picker-note">${escapeHtml(product.supplier?.name || "Sin proveedor")}</span>
           </div>
@@ -2980,6 +2974,7 @@ function renderOrderCart() {
       <div class="order-cart-row">
         <div class="order-cart-main">
           <strong>${escapeHtml(product.name)}</strong>
+          ${machineChipMarkup(product)}
           <span class="order-cart-meta">${escapeHtml(meta || "Sin referencia")}</span>
         </div>
         <input type="number" class="order-qty-input" min="1" step="1" value="${quantity}" data-product-id="${product.id}" aria-label="Cantidad de ${escapeHtml(product.name)}" />

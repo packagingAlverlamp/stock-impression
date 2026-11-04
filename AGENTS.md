@@ -202,23 +202,26 @@ en el servidor y no solo en el formulario.
   - Verificado en navegador local con datos simulados: banner, modal con todos
     los usuarios, bloqueo sin responsable, correo informativo con la línea del
     responsable y sin errores de consola.
-- Ajustes de diseño web (03/11/2026):
+- Ajustes de diseño web (03/11/2026, revisados el 04/11/2026):
   - Pantalla de acceso: `body.auth-mode` oculta el menú lateral y centra una
     tarjeta de 460 px con borde superior degradado y sombra; `body.booting`
-    evita el parpadeo mientras Supabase resuelve la sesión.
-  - En escritorio el sidebar ya no muestra “Escanear” (sigue en móvil) y las
-    vistas se centran con un máximo de 1080 px.
-  - El topbar muestra el título de la sección con el eyebrow “Stock Impresión”.
+    evita el parpadeo mientras Supabase resuelve la sesión. Este diseño se
+    mantiene porque el usuario lo aprobó.
   - Los enlaces del acceso (“¿Olvidaste tu contraseña?” y “¿No tienes
     cuenta? Regístrate”) quedan en una sola fila con separador, fuera de los
     formularios: el enlace de recuperación solo aparece en el login y toda la
     fila se oculta en el formulario de nueva contraseña. Por debajo de 420 px
     se apilan sin separador.
   - Cada suministro muestra la máquina en un chip “Máquina · …” (o “Sin
-    máquina”), en las tarjetas de Inventario de móvil y escritorio.
-  - Verificado en navegador: acceso móvil y de escritorio con la fila única,
-    cambio login/registro y recuperación sin errores de consola; `npm run
-    check` y `npm run build` correctos.
+    máquina”): en las tarjetas de Inventario, en el picker de poco stock de
+    Pedidos, en la búsqueda manual y en el carrito.
+  - El resto del rediseño de escritorio (topbar con título de sección,
+    contenido a 1080 px, shell a 1240 px) se revirtió el 04/11/2026 porque el
+    usuario prefería el diseño anterior; solo se conserva ocultar “Escanear”
+    en el sidebar de escritorio.
+  - Verificado en navegador: acceso de escritorio con la fila única, cambio
+    login/registro y recuperación sin errores de consola; `npm run check` y
+    `npm run build` correctos.
 
 ### Pendiente
 

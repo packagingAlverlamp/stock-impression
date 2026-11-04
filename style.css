@@ -135,16 +135,6 @@ a { color: var(--teal); }
   align-items: center;
   gap: 12px;
 }
-.topbar-titles { min-width: 0; }
-.topbar-eyebrow {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
 .header-brand-mark {
   width: 26px;
   height: 26px;
@@ -2474,59 +2464,8 @@ body.auth-mode .auth-switch { margin-top: 22px; }
     font-size: 13px;
   }
 
-  /* App de escritorio: contenido centrado en el espacio libre del menú */
-  body:not(.auth-mode) {
-    padding: 0 0 0 calc(var(--sidebar-width) + 36px);
-    justify-content: center;
-  }
-
-  body:not(.auth-mode) #shell {
-    width: 100%;
-    max-width: 1240px;
-    min-height: 100vh;
-    margin: 0 auto;
-    border-radius: 0;
-    border-left: 1px solid var(--line);
-    border-right: 1px solid var(--line);
-    box-shadow: none;
-  }
-
   /* Escanear solo tiene sentido en móvil */
   nav.tabbar .tab-btn[data-view="scan"] { display: none; }
-
-  header.topbar {
-    padding: 20px 32px 18px;
-  }
-
-  header.topbar .header-brand-mark { display: none; }
-  header.topbar .topbar-eyebrow { display: none; }
-  header.topbar h1 {
-    font-size: 23px;
-    letter-spacing: -0.02em;
-  }
-
-  #view-list,
-  #view-scan,
-  #view-analytics,
-  #view-add,
-  #view-profile,
-  #view-suppliers,
-  #view-machines,
-  #view-orders {
-    width: 100%;
-    max-width: 1080px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 32px;
-    padding-right: 32px;
-  }
-
-  #view-list,
-  #view-analytics,
-  #view-orders {
-    padding-top: 28px;
-    padding-bottom: 80px;
-  }
 }
 
 @media (max-width: 420px) {
@@ -2563,4 +2502,9 @@ body.auth-mode .auth-switch { margin-top: 22px; }
   background: transparent;
   color: var(--ink-soft);
   font-weight: 500;
+}
+
+.order-picker-main .product-machine,
+.order-cart-main .product-machine {
+  margin: 4px 0 0;
 }
