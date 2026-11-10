@@ -254,6 +254,15 @@ en el servidor y no solo en el formulario.
     minor/patch).
   - HIBP (contraseñas filtradas) **no se puede activar**: la API devuelve
     HTTP 402 (“available on Pro Plans and up”).
+- Taller en dos columnas (10/11/2026):
+  - En escritorio (≥1100 px) `#view-machines` muestra “Maquinaria” a la
+    izquierda y “Solicitudes de servicio técnico” a la derecha
+    (`.workshop-machines-grid`, dos `minmax(0, 1fr)` con 28 px de separación y
+    `align-items: start`). Por debajo de 1100 px sigue apilado como antes.
+  - La cabecera de Máquinas (título + “Nueva máquina”) va dentro de su columna
+    y el título de Solicitudes se alinea a la misma altura.
+  - Verificado con medidas reales: 390/500 px una columna sin desbordamiento,
+    900 px una columna de 535 px, 1100 px dos de 353 px, 1440 px dos de 524 px.
 - Build de previews de Vercel (10/11/2026):
   - El preview de la rama de Dependabot falló porque `generate-config.js`
     exigía `SUPABASE_URL`/`SUPABASE_ANON_KEY`, variables que solo están
