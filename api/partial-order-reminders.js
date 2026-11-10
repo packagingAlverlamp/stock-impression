@@ -2,8 +2,16 @@
 // Lo ejecuta un cron diario de Vercel.
 
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
 
 const REMINDER_AFTER_DAYS = 7;
+
+const safeEqual = (left, right) => {
+  const a = Buffer.from(String(left || ''));
+  const b = Buffer.from(String(right || ''));
+  if (!a.length || a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
 
 function formatOrderNumber(order) {
   const number = Number(order.order_number);
@@ -68,7 +76,7 @@ module.exports = async (req, res) => {
   if (!cronSecret) {
     return res.status(500).json({ ok: false, message: 'Missing CRON_SECRET' });
   }
-  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (!safeEqual(req.headers.authorization, `Bearer ${cronSecret}`)) {
     return res.status(401).json({ ok: false, message: 'Unauthorized' });
   }
 
@@ -103,7 +111,8 @@ module.exports = async (req, res) => {
     .limit(50);
 
   if (ordersError) {
-    return res.status(500).json({ ok: false, message: ordersError.message });
+    console.error('[partial-order-reminders] Error al leer pedidos:', ordersError.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron leer los pedidos' });
   }
   if (!orders || !orders.length) {
     return res.status(200).json({ ok: true, sent: 0, orders: 0, message: 'No partial orders to remind' });
@@ -116,7 +125,8 @@ module.exports = async (req, res) => {
     .in('order_id', orderIds);
 
   if (itemsError) {
-    return res.status(500).json({ ok: false, message: itemsError.message });
+    console.error('[partial-order-reminders] Error al leer líneas:', itemsError.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron leer las líneas del pedido' });
   }
 
   const itemsByOrder = new Map();
@@ -130,7 +140,8 @@ module.exports = async (req, res) => {
     .select('email');
 
   if (profilesError) {
-    return res.status(500).json({ ok: false, message: profilesError.message });
+    console.error('[partial-order-reminders] Error al leer perfiles:', profilesError.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron leer los destinatarios' });
   }
 
   const excluded = new Set(
@@ -163,7 +174,8 @@ module.exports = async (req, res) => {
         user_id: emailJsPublicKey,
         accessToken: emailJsPrivateKey,
         template_params: { to_email: email, subject, message }
-      })
+      }),
+      signal: AbortSignal.timeout(15000),
     });
     return response.ok;
   }));
@@ -185,7 +197,8 @@ module.exports = async (req, res) => {
     .in('id', orderIds);
 
   if (updateError) {
-    return res.status(500).json({ ok: false, message: updateError.message, sent });
+    console.error('[partial-order-reminders] Error al marcar el aviso:', updateError.message);
+    return res.status(500).json({ ok: false, message: 'Los avisos se enviaron pero no se pudo registrar la marca', sent });
   }
 
   return res.status(200).json({ ok: true, sent, orders: orders.length });

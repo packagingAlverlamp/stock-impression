@@ -17,11 +17,21 @@ const crypto = require('crypto');
 const MAX_RECIPIENTS = 50;
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_BODY_LENGTH = 100000;
+const MAX_REQUEST_BYTES = 25 * 1024 * 1024;
 
 const parseJsonBody = (req) => new Promise((resolve, reject) => {
   if (req.body && typeof req.body === 'object') return resolve(req.body);
   let data = '';
-  req.on('data', (chunk) => { data += chunk; });
+  let size = 0;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > MAX_REQUEST_BYTES) {
+      reject(new Error('Payload too large'));
+      req.destroy();
+      return;
+    }
+    data += chunk;
+  });
   req.on('end', () => {
     try { resolve(JSON.parse(data || '{}')); } catch (err) { reject(err); }
   });
@@ -81,6 +91,9 @@ module.exports = async (req, res) => {
   try {
     body = await parseJsonBody(req);
   } catch (err) {
+    if (err?.message === 'Payload too large') {
+      return res.status(413).json({ ok: false, error: 'El cuerpo de la petición es demasiado grande' });
+    }
     return res.status(400).json({ ok: false, error: 'Invalid JSON body' });
   }
 
@@ -172,6 +185,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {

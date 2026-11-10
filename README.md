@@ -237,6 +237,9 @@ genera solo, sin coste.
 
 ## Seguridad y registro
 
+El análisis completo, las medidas aplicadas y los riesgos que quedan abiertos
+están en **[`SEGURIDAD.md`](SEGURIDAD.md)**.
+
 - **Solo emails @alverlamp.es**: la función `handle_new_user` de
   `supabase/schema.sql` rechaza cualquier registro con otro dominio. Para una
   instalación existente aplica
@@ -244,20 +247,38 @@ genera solo, sin coste.
   `supabase db push`. La validación del formulario es solo para dar un mensaje
   claro; el bloqueo real está en la base de datos y también cubre llamadas
   directas a la API de Supabase.
+- **RLS restrictiva por dominio**: la migración
+  `20261110120000_security_hardening.sql` añade una política restrictiva a
+  todas las tablas (y al bucket de fotos) que exige que el JWT pertenezca a
+  `@alverlamp.es`. Las cuentas antiguas de otros dominios quedan sin acceso
+  aunque sigan existiendo. El email del perfil es inmutable desde el cliente.
+- **Cabeceras y CSP**: `vercel.json` aplica `Content-Security-Policy` con
+  `script-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'` y
+  `form-action 'self'`, además de HSTS, `X-Frame-Options: DENY`, COOP, CORP y
+  `Permissions-Policy`. Las librerías de terceros (Supabase, html5-qrcode y
+  EmailJS) se sirven desde `public/vendor/`, así que no se ejecuta código de
+  CDNs externos en tiempo de ejecución.
 - **Confirmación de email activada**: la cuenta no recibe acceso hasta que la
   persona confirma el correo. Esto evita que alguien se registre con una
   dirección `@alverlamp.es` que no controla. Revisa la Site URL y el SMTP en
   **Authentication** antes de usar la app en producción.
-- **RLS e inventario compartido**: cualquier persona con cuenta puede ver y
-  modificar el inventario, los proveedores y las máquinas. Mantén el registro
-  restringido y revisa periódicamente quién tiene cuenta.
+- **RLS e inventario compartido**: cualquier persona con cuenta corporativa
+  puede ver y modificar el inventario, los proveedores y las máquinas. Mantén
+  el registro restringido y revisa periódicamente quién tiene cuenta.
 - **EmailJS**: la clave pública es visible por diseño. En el panel de EmailJS,
   restringe el origen permitido a tu dominio para evitar que otros usen tu
   plantilla.
+- **Edge Function `delete-account`**: exige JWT válido y solo acepta los
+  orígenes de `ALLOWED_ORIGIN` (por defecto producción y `localhost:3000`).
 - **Endpoint SendGrid** (`/api/send-email`): requiere `EMAIL_API_SECRET` y la
   cabecera `Authorization: Bearer <secreto>`. Sin ese secreto responde 503.
-  No lo llames desde el navegador con el secreto incrustado; úsalo desde un
-  servidor, un cron o una herramienta interna.
+  Limita el tamaño del cuerpo (25 MB), valida destinatarios y adjuntos y usa
+  comparación en tiempo constante. No lo llames desde el navegador con el
+  secreto incrustado; úsalo desde un servidor, un cron o una herramienta
+  interna.
+- **Crons**: `weekly-low-stock` y `partial-order-reminders` comparan
+  `CRON_SECRET` en tiempo constante y no devuelven mensajes internos de la
+  base de datos.
 - **Apps Script**: solo envía a los emails de `TEAM_EMAILS` y limita los
   envíos por hora. Así, aunque la URL sea pública, no puede usarse para
   mandar correo a terceros.

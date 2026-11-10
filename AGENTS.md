@@ -222,9 +222,34 @@ en el servidor y no solo en el formulario.
   - Verificado en navegador: acceso de escritorio con la fila única, cambio
     login/registro y recuperación sin errores de consola; `npm run check` y
     `npm run build` correctos.
+- Análisis y endurecimiento de seguridad (10/11/2026):
+  - CSP estricta (`script-src 'self'`, `object-src 'none'`,
+    `frame-ancestors 'none'`) y cabeceras COOP/CORP/Permissions-Policy en
+    `vercel.json`.
+  - Librerías de terceros movidas de CDN a `public/vendor/` con versiones
+    fijas (supabase-js 2.117.2, html5-qrcode 2.3.8, emailjs-com 3.2.0). La
+    inicialización de EmailJS pasa de un script inline a `app.js`.
+  - Migración `20261110120000_security_hardening.sql` aplicada en remoto:
+    `is_alverlamp_user()` y políticas restrictivas por dominio en todas las
+    tablas y en el bucket de fotos; `revoke` a `anon`; trigger que impide
+    cambiar `id`/`email` del perfil.
+  - API: límite de 25 MB y timeout en `send-email`; `timingSafeEqual` y
+    errores genéricos en los crons; CORS restringido en `delete-account`.
+  - `finishBoot()` con fallback (rAF + timeout) y red de seguridad de 6 s para
+    no dejar la pantalla en blanco si Supabase no responde.
+  - Verificado con cabeceras CSP reales en local: librerías cargan, login
+    visible, `Html5Qrcode` se inicializa y la CSP bloquea scripts inline y
+    `onerror` inyectados. `npm audit`: 0 vulnerabilidades.
+  - Informe completo en `SEGURIDAD.md`.
 
 ### Pendiente
 
+- Activar MFA TOTP en Supabase y valorar exigirlo a quien gestione pedidos.
+- Subir el mínimo de contraseña a 10 y activar la comprobación de contraseñas
+  filtradas en Supabase Auth.
+- Restringir en el panel de EmailJS el dominio permitido a
+  `stock-impresion.vercel.app`.
+- Revisar la retención de backups de Supabase y probar una restauración.
 - Tras confirmar el nuevo despliegue, eliminar `products.category` con una
   migración posterior.
 - Decidir si se configura SMTP antes de dar de alta empleados nuevos.

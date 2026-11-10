@@ -4,6 +4,12 @@
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Inicializa EmailJS si hay clave pública en config.js.
+if (typeof EMAILJS_PUBLIC_KEY !== "undefined" && EMAILJS_PUBLIC_KEY
+  && window.emailjs && typeof window.emailjs.init === "function") {
+  try { window.emailjs.init(EMAILJS_PUBLIC_KEY); } catch (_) { /* sin EmailJS */ }
+}
+
 // Evita el salto de diseño mientras Supabase resuelve la sesión.
 document.body.classList.add("booting", "auth-mode");
 
@@ -177,7 +183,9 @@ function setAuthMode(enabled) {
 }
 
 function finishBoot() {
-  requestAnimationFrame(() => document.body.classList.remove("booting"));
+  const done = () => document.body.classList.remove("booting");
+  requestAnimationFrame(done);
+  setTimeout(done, 250);
 }
 
 function showLoginForms() {
@@ -329,6 +337,11 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
     finishBoot();
   }
 });
+
+// Si Supabase tarda o no responde, no dejar la pantalla en blanco.
+setTimeout(() => {
+  if (document.body.classList.contains("booting")) finishBoot();
+}, 6000);
 
 function safeRenderInventoryState() {
   if (!$("category-pills") || !$("product-list") || !$("search-input")) return;

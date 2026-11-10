@@ -1,6 +1,14 @@
 // Weekly low-stock digest for Vercel cron, every Monday at 09:00 UTC.
 
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
+
+const safeEqual = (left, right) => {
+  const a = Buffer.from(String(left || ''));
+  const b = Buffer.from(String(right || ''));
+  if (!a.length || a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -12,7 +20,7 @@ module.exports = async (req, res) => {
   if (!cronSecret) {
     return res.status(500).json({ ok: false, message: 'Missing CRON_SECRET' });
   }
-  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (!safeEqual(req.headers.authorization, `Bearer ${cronSecret}`)) {
     return res.status(401).json({ ok: false, message: 'Unauthorized' });
   }
 
@@ -39,7 +47,8 @@ module.exports = async (req, res) => {
     .select('name, quantity, min_quantity, unit, machine:machines!products_machine_id_fkey(name)');
 
   if (productsError) {
-    return res.status(500).json({ ok: false, message: productsError.message });
+    console.error('[weekly-low-stock] Error al leer productos:', productsError.message);
+    return res.status(500).json({ ok: false, message: 'No se pudo leer el inventario' });
   }
 
   const lowStockProducts = (productsData || [])
@@ -51,7 +60,8 @@ module.exports = async (req, res) => {
     .eq('notify_low_stock', true);
 
   if (profilesError) {
-    return res.status(500).json({ ok: false, message: profilesError.message });
+    console.error('[weekly-low-stock] Error al leer perfiles:', profilesError.message);
+    return res.status(500).json({ ok: false, message: 'No se pudieron leer los destinatarios' });
   }
 
   const emails = [...new Set((profileRows || [])
@@ -86,7 +96,8 @@ module.exports = async (req, res) => {
         user_id: emailJsPublicKey,
         accessToken: emailJsPrivateKey,
         template_params: { to_email: email, subject, message }
-      })
+      }),
+      signal: AbortSignal.timeout(15000),
     });
     return response.ok;
   }));
