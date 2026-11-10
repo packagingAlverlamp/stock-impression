@@ -254,7 +254,51 @@ en el servidor y no solo en el formulario.
     minor/patch).
   - HIBP (contraseñas filtradas) **no se puede activar**: la API devuelve
     HTTP 402 (“available on Pro Plans and up”).
-- Taller en dos columnas (10/11/2026):
+- Reorganización de menús y pantalla de escaneo (10/11/2026):
+  - Se elimina el destino duplicado de Proveedores: ya no está en el sidebar
+    de escritorio (`Herramientas`) ni en la hoja “Más” del móvil. Solo se
+    llega desde **Taller → Proveedores**.
+  - Taller pasa a tener tres pestañas: **Máquinas · Proveedores ·
+    Solicitudes**. La tercera es una vista propia (`#view-service`) con el
+    título completo “Solicitudes de servicio técnico” dentro. Se elimina el
+    layout de dos columnas (`.workshop-machines-grid`).
+  - Contador en la pestaña Solicitudes (`[data-service-badge]`, máx. “9+”)
+    con las solicitudes `pending` + `in_progress`. Se oculta a 0, actualiza
+    `aria-label` y se carga al entrar en la app en segundo plano.
+  - Al entrar en Proveedores o Solicitudes se resalta **Taller**, tanto en
+    móvil como en escritorio (antes en móvil se resaltaban dos destinos).
+  - Menús resultantes:
+    - Escritorio: Principal → Inventario, Taller · Herramientas → Añadir,
+      Pedidos, Análisis · Cuenta → Perfil. **Escanear sigue oculto**, por
+      decisión explícita del usuario (no se escanea desde PC).
+    - Móvil: Inventario · Taller · Escanear · Más → Añadir, Pedidos,
+      Análisis, Perfil.
+  - Botón “+” (`#inventory-add-btn`) junto al buscador de Inventario como
+    atajo a “Añadir suministro”.
+  - Escanear rediseñado: al entrar solo se ven dos tarjetas grandes,
+    “Sacar Stock” y “Añadir Stock”; la cámara solo se enciende al pulsarlas.
+    Al leer un código la cámara se oculta y aparece la tarjeta de resultado.
+    Botones “Seguir escaneando” y “Elegir otro modo”; el visor tiene además
+    “Cerrar”. En ≥601 px las dos tarjetas van en dos columnas.
+  - Toast movido fuera de `#shell` (que tiene `backdrop-filter` y
+    `overflow:hidden`) y fijado arriba al viewport con `z-index: 2000`, para
+    que se vea sin hacer scroll. `#toast.hidden` mantiene `display: flex` con
+    `opacity: 0` para que la transición funcione.
+  - Escritorio: los botones `.btn` dejan de ocupar todo el ancho del
+    contenedor (`width: auto`), salvo en el acceso (`body.auth-mode`).
+    Perfil usa `margin: 0 10px 10px 0` para separar botones contiguos.
+  - Las tablas de **Análisis** y **Registro de stock** muestran la columna
+    **Máquina**. En el registro se resuelve con `machineNameForProductId()`
+    a partir de `allProducts`. Colspan actualizado a 9 y 7.
+  - `.table-shell.history-table-shell` y `.table-shell.analysis-table-shell`
+    suben de especificidad para que `.table-shell` (max-width 760) no recorte
+    las tablas; análisis `min-width: 1000px`, registro `860px`.
+  - Verificado en navegador con datos simulados (sin errores de consola):
+    estados de navegación, contador 2, flujo de escaneo completo por botones,
+    tablas con máquina y medidas a 390, 500, 900, 1100 y 1440 px. Las tres
+    pestañas caben a 390 px (124 px cada una, sin desbordamiento).
+- Taller en dos columnas (10/11/2026) — **sustituido** el 10/11/2026 por las
+  tres pestañas de Taller; el CSS `.workshop-machines-grid` se eliminó:
   - En escritorio (≥1100 px) `#view-machines` muestra “Maquinaria” a la
     izquierda y “Solicitudes de servicio técnico” a la derecha
     (`.workshop-machines-grid`, dos `minmax(0, 1fr)` con 28 px de separación y

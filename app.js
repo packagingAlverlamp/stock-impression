@@ -484,6 +484,8 @@ async function enterApp() {
     await loadProfiles();
     await loadSuppliers();
     await loadMachines();
+    // El contador de solicitudes se carga en segundo plano para no retrasar la entrada.
+    loadServiceRequests();
     await loadProducts();
     safeRenderInventoryState();
     showView("list");
@@ -499,7 +501,7 @@ async function enterApp() {
 // ---------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------
-const VIEWS = ["list", "machines", "add", "scan", "suppliers", "orders", "analytics", "profile"];
+const VIEWS = ["list", "machines", "service", "add", "scan", "suppliers", "orders", "analytics", "profile"];
 let lastView = "list";
 
 const MOBILE_NAV_VIEWS = new Set(["list", "machines", "scan"]);
@@ -508,6 +510,7 @@ document.querySelectorAll(".tab-btn[data-view]").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
 });
 $("empty-add-btn").addEventListener("click", () => showView("add"));
+$("inventory-add-btn").addEventListener("click", () => showView("add"));
 $("more-nav-btn").addEventListener("click", openMoreMenu);
 
 document.querySelectorAll(".workshop-tab").forEach((button) => {
@@ -529,8 +532,8 @@ function updateWorkshopTabs(name) {
 function updateNavState(name) {
   document.querySelectorAll(".tab-btn[data-view]").forEach((button) => {
     let active = button.dataset.view === name;
-    if (isMobileNav() && button.dataset.view === "machines") {
-      active = name === "machines" || name === "suppliers";
+    if (button.dataset.view === "machines") {
+      active = name === "machines" || name === "suppliers" || name === "service";
     }
     button.classList.toggle("active", active);
   });
@@ -561,16 +564,14 @@ function showView(name) {
 
   if (name !== "add") stopAddScanner();
   if (name === "scan") {
-    startStockScanner();
+    resetScanView();
   } else {
     stopStockScanner();
   }
   if (name === "profile") renderProfile();
   if (name === "suppliers") loadSuppliers();
-  if (name === "machines") {
-    loadMachines();
-    loadServiceRequests();
-  }
+  if (name === "machines") loadMachines();
+  if (name === "service") loadServiceRequests();
   if (name === "analytics") showAnalyticsSection(activeAnalyticsSection);
   if (name === "orders") openOrdersView();
   if (name === "list") {
@@ -595,10 +596,6 @@ function openMoreMenu() {
         <button type="button" class="more-menu-item" data-menu-view="add">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
           <span>Añadir suministro</span>
-        </button>
-        <button type="button" class="more-menu-item" data-menu-view="suppliers">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
-          <span>Proveedores</span>
         </button>
         <button type="button" class="more-menu-item" data-menu-view="orders">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12l2 4v12H4V8l2-4zM4 8h16M9 13h6M9 17h4"/></svg>
@@ -1033,6 +1030,12 @@ function formatStockNumber(value) {
   return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
+function machineNameForProductId(productId) {
+  const product = allProducts.find((item) => item.id === productId);
+  const name = productMachineName(product);
+  return name || "—";
+}
+
 function formatMovementDate(value) {
   return new Intl.DateTimeFormat("es-ES", {
     dateStyle: "medium",
@@ -1054,7 +1057,7 @@ function renderStockHistory() {
   if (!tbody) return;
 
   if (!historyRows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">No hay movimientos que coincidan con los filtros.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-empty-cell">No hay movimientos que coincidan con los filtros.</td></tr>';
   } else {
     tbody.innerHTML = historyRows.map((movement) => {
       const delta = Number(movement.quantity_delta);
@@ -1069,6 +1072,7 @@ function renderStockHistory() {
         <tr>
           <td data-label="Fecha">${escapeHtml(formatMovementDate(movement.created_at))}</td>
           <td data-label="Suministro" class="movement-product-cell">${escapeHtml(movement.product_name)}</td>
+          <td data-label="Máquina" class="movement-machine-cell">${escapeHtml(machineNameForProductId(movement.product_id))}</td>
           <td data-label="Movimiento"><span class="movement-type ${escapeHtml(movement.movement_type)}">${escapeHtml(movementTypeLabel(movement.movement_type))}</span></td>
           <td data-label="Cambio" class="movement-delta ${delta < 0 ? "negative" : delta > 0 ? "positive" : ""}">${deltaLabel}</td>
           <td data-label="Stock resultante">${before} → ${formatStockNumber(movement.quantity_after)}${movement.unit ? ` ${escapeHtml(movement.unit)}` : ""}</td>
@@ -1214,7 +1218,7 @@ function buildProductConsumptionStats(product, movements, now) {
 
 async function loadStockAnalytics() {
   const tbody = $("analysis-table-body");
-  tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">Calculando análisis…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">Calculando análisis…</td></tr>';
 
   try {
     const movements = await loadAllStockMovements();
@@ -1224,7 +1228,7 @@ async function loadStockAnalytics() {
       : "—";
 
     if (!allProducts.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">No hay suministros para analizar.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">No hay suministros para analizar.</td></tr>';
       return;
     }
 
@@ -1240,6 +1244,7 @@ async function loadStockAnalytics() {
     tbody.innerHTML = rows.map((stats) => `
       <tr>
         <td data-label="Suministro" class="movement-product-cell">${escapeHtml(stats.product.name)}</td>
+        <td data-label="Máquina" class="movement-machine-cell">${escapeHtml(stats.product.machine?.name || "—")}</td>
         <td data-label="Stock actual">${formatStockNumber(stats.product.quantity)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}</td>
         <td data-label="Entradas">${formatStockNumber(stats.incoming)}</td>
         <td data-label="Salidas">${formatStockNumber(stats.outgoing)}</td>
@@ -1250,7 +1255,7 @@ async function loadStockAnalytics() {
       </tr>
     `).join("");
   } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="8" class="table-empty-cell">No se pudo cargar el análisis de consumo.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">No se pudo cargar el análisis de consumo.</td></tr>';
     showToast("Error al calcular el análisis: " + error.message);
   }
 }
@@ -1676,7 +1681,25 @@ function formatServiceDate(value) {
   return date.toLocaleString("es-ES");
 }
 
+function updateServiceBadge() {
+  const open = allServiceRequests.filter(
+    (request) => request.status === "pending" || request.status === "in_progress"
+  ).length;
+  document.querySelectorAll("[data-service-badge]").forEach((badge) => {
+    badge.textContent = open > 9 ? "9+" : String(open);
+    badge.classList.toggle("hidden", open === 0);
+    const tab = badge.closest(".workshop-tab");
+    if (tab) {
+      tab.setAttribute(
+        "aria-label",
+        open === 0 ? "Solicitudes" : `Solicitudes, ${open} sin resolver`
+      );
+    }
+  });
+}
+
 function renderServiceRequests() {
+  updateServiceBadge();
   const container = $("service-requests-list");
   if (!container) return;
   if (!allServiceRequests.length) {
@@ -4220,32 +4243,48 @@ $("form-add-product").addEventListener("submit", async (e) => {
 // ---------------------------------------------------------------
 // Escanear (sacar / añadir stock)
 // ---------------------------------------------------------------
-$("mode-out-btn").addEventListener("click", () => setScanMode("out"));
-$("mode-in-btn").addEventListener("click", () => setScanMode("in"));
+$("mode-out-btn").addEventListener("click", () => pickScanMode("out"));
+$("mode-in-btn").addEventListener("click", () => pickScanMode("in"));
+$("scan-camera-close").addEventListener("click", resetScanView);
 
 function setScanMode(mode) {
   stockScanMode = mode;
-  $("mode-out-btn").classList.toggle("active", mode === "out");
-  $("mode-in-btn").classList.toggle("active", mode === "in");
-  $("scan-result").classList.add("hidden");
-  $("scan-result").innerHTML = "";
+  const label = $("scan-mode-label");
+  if (label) label.textContent = mode === "out" ? "Sacar stock" : "Añadir stock";
 }
 
 function setScanCameraVisible(visible) {
-  const camera = $("qr-reader");
-  if (!camera) return;
-  if (visible) {
-    camera.classList.remove("hidden");
-  } else {
-    camera.classList.add("hidden");
-  }
+  const camera = $("scan-camera");
+  if (camera) camera.classList.toggle("hidden", !visible);
+  const picker = $("scan-mode-picker");
+  if (picker) picker.classList.toggle("hidden", visible);
+}
+
+function clearScanResult() {
+  const resultBox = $("scan-result");
+  if (!resultBox) return;
+  resultBox.classList.add("hidden");
+  resultBox.innerHTML = "";
+}
+
+// Vuelve a la pantalla de los dos botones grandes y apaga la cámara.
+function resetScanView() {
+  stopStockScanner();
+  clearScanResult();
+  setScanCameraVisible(false);
+}
+
+function pickScanMode(mode) {
+  setScanMode(mode);
+  clearScanResult();
+  setScanCameraVisible(true);
+  startStockScanner();
 }
 
 function startStockScanner() {
   if (stockScanner) return;
   setScanCameraVisible(true);
-  $("scan-result").classList.add("hidden");
-  $("scan-result").innerHTML = "";
+  clearScanResult();
   stockScanner = new Html5Qrcode("qr-reader");
   stockScanner
     .start(
@@ -4289,13 +4328,15 @@ async function onStockScan(ean) {
         <h3>Código no encontrado</h3>
         <p class="product-meta">EAN: ${escapeHtml(ean)}</p>
         <button type="button" class="btn btn-teal" id="scan-add-new">Añadir como suministro nuevo</button>
-        <button type="button" class="btn btn-ghost" id="scan-resume">Seguir escaneando</button>
+        <button type="button" class="btn btn-outline" id="scan-resume">Seguir escaneando</button>
+        <button type="button" class="btn btn-ghost" id="scan-back">Elegir otro modo</button>
       </div>`;
     $("scan-add-new").addEventListener("click", () => {
       showView("add");
       $("add-ean").value = ean;
     });
     $("scan-resume").addEventListener("click", resumeScan);
+    $("scan-back").addEventListener("click", resetScanView);
     return;
   }
 
@@ -4311,7 +4352,8 @@ async function onStockScan(ean) {
         <button type="button" id="scan-plus">+</button>
       </div>
       <button type="button" class="btn ${stockScanMode === "out" ? "btn-red" : "btn-teal"}" id="scan-confirm">${label}</button>
-      <button type="button" class="btn btn-ghost" id="scan-resume">Cancelar y seguir escaneando</button>
+      <button type="button" class="btn btn-outline" id="scan-resume">Seguir escaneando</button>
+      <button type="button" class="btn btn-ghost" id="scan-back">Elegir otro modo</button>
     </div>`;
 
   $("scan-minus").addEventListener("click", () => {
@@ -4326,18 +4368,22 @@ async function onStockScan(ean) {
     const button = $("scan-confirm");
     const amount = Number($("scan-delta").value) || 1;
     const delta = stockScanMode === "out" ? -amount : amount;
+    let done = false;
     await withBusy(button, "Aplicando…", async () => {
       const updated = await applyQuantityDelta(product, delta);
-      if (updated) showToast(`${label}: ${amount} × ${product.name}`);
+      if (updated) {
+        done = true;
+        showToast(`${label}: ${amount} × ${product.name}`);
+      }
     });
-    resumeScan();
+    if (done) resumeScan();
   });
   $("scan-resume").addEventListener("click", resumeScan);
+  $("scan-back").addEventListener("click", resetScanView);
 }
 
 function resumeScan() {
-  $("scan-result").classList.add("hidden");
-  $("scan-result").innerHTML = "";
+  clearScanResult();
   setScanCameraVisible(true);
   if (stockScanner) {
     stockScanner.resume();

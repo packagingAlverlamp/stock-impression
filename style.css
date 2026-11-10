@@ -351,6 +351,45 @@ main.view:not(.hidden) {
 }
 
 /* ---------- Product list ---------- */
+.search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.search-row .search-input-wrap {
+  margin-bottom: 0;
+}
+
+.inventory-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: var(--teal);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(15, 142, 118, 0.24);
+}
+
+.inventory-add-btn svg { width: 22px; height: 22px; }
+
+.inventory-add-btn:hover {
+  background: #0c8d71;
+  transform: translateY(-1px);
+}
+
+.search-row .category-pills {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 .search-input-wrap {
   position: relative;
   margin-bottom: 12px;
@@ -428,22 +467,27 @@ main.view:not(.hidden) {
   background: var(--surface-strong);
   color: var(--ink);
 }
-.history-table-shell,
-.analysis-table-shell {
+.table-shell.history-table-shell,
+.table-shell.analysis-table-shell {
   width: 100%;
   max-width: none;
   overflow-x: auto;
 }
 .movement-table,
 .analysis-table {
-  min-width: 760px;
+  min-width: 860px;
 }
 .analysis-table {
-  min-width: 1080px;
+  min-width: 1000px;
 }
 .movement-product-cell {
   min-width: 180px;
   font-weight: 600;
+}
+.movement-machine-cell {
+  color: var(--ink-soft);
+  font-size: 13px;
+  white-space: nowrap;
 }
 .movement-type {
   display: inline-flex;
@@ -802,6 +846,7 @@ main.view:not(.hidden) {
 }
 
 .workshop-tab {
+  position: relative;
   flex: 1 1 0;
   min-height: 38px;
   padding: 8px 16px;
@@ -812,12 +857,47 @@ main.view:not(.hidden) {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .workshop-tab.active {
   background: var(--surface-strong);
   color: var(--ink);
   box-shadow: 0 1px 3px rgba(17, 24, 39, 0.12);
+}
+
+.workshop-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 1px;
+}
+
+@media (max-width: 600px) {
+  .workshop-tabs {
+    display: flex;
+    width: 100%;
+    max-width: none;
+  }
+
+  .workshop-tab {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .workshop-tab-badge {
+    margin-left: 4px;
+  }
 }
 
 /* ---------- Forms (add / edit) ---------- */
@@ -1006,12 +1086,6 @@ h2.section-title {
 .service-modal-provider {
   color: var(--ink-soft);
   font-size: 13px;
-}
-
-.service-history-section {
-  margin-top: 30px;
-  width: min(var(--supplier-table-width), 100%);
-  max-width: var(--supplier-table-width);
 }
 
 .service-request-photos {
@@ -1439,29 +1513,98 @@ h2.section-title {
 .two-col .field { flex: 1; }
 
 /* ---------- Scan view ---------- */
-.mode-toggle {
-  display: flex;
-  border: 1px solid var(--ink);
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 16px;
+.scan-mode-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 18px;
 }
-.mode-toggle button {
-  flex: 1;
-  padding: 11px;
-  border: none;
-  background: var(--surface);
+
+@media (min-width: 601px) {
+  .scan-mode-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.scan-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 128px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scan-mode-btn svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+}
+
+.scan-mode-btn.out { border-color: rgba(214, 49, 42, 0.28); }
+.scan-mode-btn.in { border-color: rgba(15, 142, 118, 0.28); }
+.scan-mode-btn.out svg { color: var(--red); }
+.scan-mode-btn.in svg { color: var(--teal); }
+
+.scan-mode-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.1);
+}
+
+.scan-mode-title {
+  font-size: 19px;
+  font-weight: 700;
   color: var(--ink);
+}
+
+.scan-mode-sub {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.scan-camera {
+  width: 100%;
+  max-width: 760px;
+}
+
+.scan-camera-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.scan-mode-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.scan-camera-close {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  border-radius: 0;
-  transition: background-color var(--duration-fast) var(--ease-standard),
-              color var(--duration-fast) var(--ease-standard),
-              transform var(--duration-fast) var(--ease-out-cubic);
 }
-.mode-toggle button:hover { transform: translateY(-1px); }
-.mode-toggle button.active.out { background: var(--red); color: #fff; }
-.mode-toggle button.active.in { background: var(--teal); color: #fff; }
+
+.scan-camera-close:hover { background: var(--paper); }
 
 #qr-reader {
   border: 1px solid var(--line);
@@ -1482,6 +1625,8 @@ h2.section-title {
 }
 .scan-result-card h3 { margin: 0 0 4px; font-size: 17px; }
 .scan-result-card .product-meta { margin-bottom: 12px; }
+.scan-result-card { max-width: 760px; }
+.scan-result-card .btn + .btn { margin-top: 10px; }
 
 .qty-adjust-row {
   display: flex;
@@ -1732,23 +1877,32 @@ nav.tabbar svg { width: 21px; height: 21px; }
 /* ---------- Toast ---------- */
 #toast {
   position: fixed;
-  bottom: 84px;
+  top: max(14px, env(safe-area-inset-top));
   left: 50%;
-  transform: translateX(-50%) translateY(8px);
+  transform: translateX(-50%) translateY(0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(92vw, 460px);
+  padding: 12px 20px;
+  border-radius: 999px;
   background: var(--ink);
   color: var(--paper);
-  padding: 11px 18px;
-  border-radius: 30px;
   font-size: 13.5px;
-  z-index: 30;
-  max-width: 90%;
+  line-height: 1.35;
   text-align: center;
+  box-shadow: 0 12px 30px rgba(17, 24, 39, 0.24);
+  z-index: 2000;
+  pointer-events: none;
   opacity: 1;
   transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 #toast.hidden {
+  display: flex !important;
   opacity: 0;
-  transform: translateX(-50%) translateY(12px);
+  transform: translateX(-50%) translateY(-10px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2032,7 +2186,19 @@ nav.tabbar svg { width: 21px; height: 21px; }
 
   #view-profile .btn {
     width: auto;
-    display: inline-block;
+    display: inline-flex;
+    margin: 0 10px 10px 0;
+  }
+
+  /* En escritorio los botones no ocupan todo el ancho del contenedor:
+     solo el acceso mantiene el botón a todo lo ancho de la tarjeta. */
+  .btn {
+    width: auto;
+    min-width: 0;
+  }
+
+  body.auth-mode .btn {
+    width: 100%;
   }
 }
 
@@ -2539,43 +2705,4 @@ body.auth-mode .auth-switch { margin-top: 22px; }
 .order-picker-main .product-machine,
 .order-cart-main .product-machine {
   margin: 4px 0 0;
-}
-
-/* ---------- Taller: Maquinaria y solicitudes en dos columnas ---------- */
-.workshop-machines-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 28px;
-  width: 100%;
-  min-width: 0;
-}
-
-.workshop-machines-grid > * {
-  min-width: 0;
-}
-
-.workshop-machines-grid .service-history-section {
-  margin-top: 0;
-}
-
-@media (min-width: 1100px) {
-  .workshop-machines-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .workshop-machines-grid .section-header,
-  .workshop-machines-grid .machines-list,
-  .workshop-machines-grid .service-requests-list,
-  .workshop-machines-grid .service-history-section {
-    width: 100%;
-    max-width: none;
-  }
-
-  .workshop-machines-grid .service-history-section > .section-title {
-    display: flex;
-    align-items: center;
-    min-height: 46px;
-    margin: 0 0 18px;
-  }
 }

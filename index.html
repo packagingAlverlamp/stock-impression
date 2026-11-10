@@ -43,10 +43,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
         <span>Añadir</span>
       </button>
-      <button type="button" class="tab-btn" data-view="suppliers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12M8 10h8M8 14h6"/></svg>
-        <span>Proveedores</span>
-      </button>
       <button type="button" class="tab-btn" data-view="orders">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12l2 4v12H4V8l2-4zM4 8h16M9 13h6M9 17h4"/></svg>
         <span>Pedidos</span>
@@ -157,6 +153,9 @@
           <input type="text" id="search-input" placeholder="Buscar por nombre, máquina, ubicación..." />
           <button type="button" id="clear-search" class="clear-search hidden" aria-label="Borrar búsqueda">×</button>
         </div>
+        <button type="button" id="inventory-add-btn" class="inventory-add-btn" aria-label="Añadir suministro" title="Añadir suministro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <div id="category-pills" class="category-pills" aria-hidden="false"></div>
       </div>
       <div id="product-list"></div>
@@ -233,13 +232,27 @@
     <main id="view-scan" class="view hidden">
       <h2 class="section-title">Escanear</h2>
 
-      <div class="mode-toggle">
-        <button type="button" id="mode-out-btn" class="active out">Sacar stock</button>
-        <button type="button" id="mode-in-btn" class="in">Añadir stock</button>
+      <div id="scan-mode-picker" class="scan-mode-picker">
+        <button type="button" id="mode-out-btn" class="scan-mode-btn out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14"/></svg>
+          <span class="scan-mode-title">Sacar Stock</span>
+          <span class="scan-mode-sub">Descuenta unidades del inventario</span>
+        </button>
+        <button type="button" id="mode-in-btn" class="scan-mode-btn in">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="scan-mode-title">Añadir Stock</span>
+          <span class="scan-mode-sub">Suma unidades al inventario</span>
+        </button>
       </div>
 
-      <div id="qr-reader"></div>
-      <p class="scan-hint" id="scan-hint">Apunta con la cámara al código de barras del producto</p>
+      <div id="scan-camera" class="scan-camera hidden">
+        <div class="scan-camera-head">
+          <span id="scan-mode-label" class="scan-mode-label">Sacar stock</span>
+          <button type="button" id="scan-camera-close" class="scan-camera-close" aria-label="Cerrar la cámara">Cerrar</button>
+        </div>
+        <div id="qr-reader"></div>
+        <p class="scan-hint" id="scan-hint">Apunta con la cámara al código de barras del producto</p>
+      </div>
 
       <div id="scan-result" class="hidden"></div>
     </main>
@@ -249,6 +262,7 @@
       <div class="workshop-tabs" role="tablist" aria-label="Secciones de taller">
         <button type="button" class="workshop-tab" data-workshop-view="machines" role="tab" aria-selected="false">Máquinas</button>
         <button type="button" class="workshop-tab active" data-workshop-view="suppliers" role="tab" aria-selected="true">Proveedores</button>
+        <button type="button" class="workshop-tab" data-workshop-view="service" role="tab" aria-selected="false">Solicitudes<span class="workshop-tab-badge hidden" data-service-badge>0</span></button>
       </div>
 
       <div class="section-header">
@@ -277,22 +291,28 @@
       <div class="workshop-tabs" role="tablist" aria-label="Secciones de taller">
         <button type="button" class="workshop-tab active" data-workshop-view="machines" role="tab" aria-selected="true">Máquinas</button>
         <button type="button" class="workshop-tab" data-workshop-view="suppliers" role="tab" aria-selected="false">Proveedores</button>
+        <button type="button" class="workshop-tab" data-workshop-view="service" role="tab" aria-selected="false">Solicitudes<span class="workshop-tab-badge hidden" data-service-badge>0</span></button>
       </div>
 
-      <div class="workshop-machines-grid">
-        <section class="machines-column">
-          <div class="section-header">
-            <h2 class="section-title">Maquinaria</h2>
-            <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>
-          </div>
-          <div id="machines-list" class="machines-list"></div>
-        </section>
-
-        <section class="service-history-section">
-          <h2 class="section-title">Solicitudes de servicio técnico</h2>
-          <div id="service-requests-list" class="service-requests-list"></div>
-        </section>
+      <div class="section-header">
+        <h2 class="section-title">Maquinaria</h2>
+        <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>
       </div>
+      <div id="machines-list" class="machines-list"></div>
+    </main>
+
+    <!-- ---------- Vista: Solicitudes de servicio técnico ---------- -->
+    <main id="view-service" class="view hidden">
+      <div class="workshop-tabs" role="tablist" aria-label="Secciones de taller">
+        <button type="button" class="workshop-tab" data-workshop-view="machines" role="tab" aria-selected="false">Máquinas</button>
+        <button type="button" class="workshop-tab" data-workshop-view="suppliers" role="tab" aria-selected="false">Proveedores</button>
+        <button type="button" class="workshop-tab active" data-workshop-view="service" role="tab" aria-selected="true">Solicitudes<span class="workshop-tab-badge hidden" data-service-badge>0</span></button>
+      </div>
+
+      <div class="section-header">
+        <h2 class="section-title">Solicitudes de servicio técnico</h2>
+      </div>
+      <div id="service-requests-list" class="service-requests-list"></div>
     </main>
 
     <!-- ---------- Vista: Pedidos ---------- -->
@@ -398,6 +418,7 @@
             <thead>
               <tr>
                 <th>Suministro</th>
+                <th>Máquina</th>
                 <th>Stock actual</th>
                 <th>Entradas</th>
                 <th>Salidas</th>
@@ -439,6 +460,7 @@
               <tr>
                 <th>Fecha</th>
                 <th>Suministro</th>
+                <th>Máquina</th>
                 <th>Movimiento</th>
                 <th>Cambio</th>
                 <th>Stock resultante</th>
@@ -516,8 +538,9 @@
 
   </div>
 
-  <div id="toast" class="hidden"></div>
 </div>
+
+<div id="toast" role="status" aria-live="polite" class="hidden"></div>
 
 <!-- Librerías -->
 <script src="vendor/supabase-js.min.js"></script>
