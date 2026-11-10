@@ -417,18 +417,23 @@
       </div>
       <section id="analytics-panel-analytics" class="analytics-panel">
         <h2 class="section-title">Análisis de consumo</h2>
-        <p class="page-intro">Estimaciones calculadas con las salidas registradas y el ritmo real de cada suministro, contando solo los días en los que hubo actividad.</p>
-        <div class="analysis-notice">
-          El historial comienza el <strong id="analysis-start-date">—</strong>. Los movimientos anteriores a esa fecha no están disponibles, así que las medias mejorarán a medida que se registren más datos.
+        <div class="analysis-top">
+          <div class="analysis-top-copy">
+            <p class="page-intro">Estimaciones calculadas con las salidas registradas y el ritmo real de cada suministro.</p>
+            <div class="analysis-notice">
+              El historial comienza el <strong id="analysis-start-date">—</strong>. Los movimientos anteriores a esa fecha no están disponibles, así que las medias mejorarán a medida que se registren más datos.
+            </div>
+          </div>
+          <div id="analysis-risk" class="analysis-risk hidden"></div>
         </div>
 
-        <div id="analysis-risk" class="analysis-risk hidden"></div>
-
-        <h3 class="section-subtitle analysis-machines-title">Consumo por máquina</h3>
-        <p class="page-intro analysis-machines-intro">
-          El ritmo se calcula con los días en los que de verdad hubo salidas de stock, no con el calendario.
-          El plazo de entrega sale de los pedidos ya recibidos de cada proveedor.
-        </p>
+        <div class="analysis-machines-head">
+          <h3 class="section-subtitle analysis-machines-title">Consumo por máquina</h3>
+          <p class="page-intro analysis-machines-intro">
+            El ritmo se calcula con las salidas registradas y el tiempo transcurrido.
+            El aviso solo indica cuándo toca pedir, sin proponer cantidades.
+          </p>
+        </div>
         <div id="analysis-machines" class="analysis-machines"></div>
 
         <div class="table-shell analysis-table-shell">
@@ -449,7 +454,7 @@
             <tbody id="analysis-table-body"></tbody>
           </table>
         </div>
-        <p class="analysis-footnote">El ritmo de consumo son unidades por día de trabajo (días con alguna salida), no por día de calendario. La fecha de agotamiento aplica ese ritmo al stock actual y el plazo de entrega es la media real de los pedidos ya recibidos de cada proveedor.</p>
+        <p class="analysis-footnote">El ritmo de consumo es la media de unidades al día de los últimos 30 días, o del tiempo transcurrido si hay menos historial. La fecha de agotamiento aplica ese ritmo al stock actual y el plazo de entrega es la media real de los pedidos ya recibidos de cada proveedor. Cuando hay muy pocas salidas, la estimación se muestra como “faltan datos” en lugar de inventar una fecha.</p>
       </section>
       <section id="analytics-panel-history" class="analytics-panel hidden" role="tabpanel">
         <h2 class="section-title">Registro de stock</h2>

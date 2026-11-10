@@ -586,15 +586,25 @@ main.view:not(.hidden) {
   color: var(--teal);
 }
 .analytics-panel .section-title { margin-top: 0; }
-.analysis-footnote { max-width: 900px; line-height: 1.5; }
+.analysis-footnote { max-width: none; line-height: 1.5; }
 
 /* ---------- Análisis: consumo por máquina ---------- */
+/* Texto y aviso de riesgo en dos columnas: en escritorio no se apilan dos
+   bloques de altura antes de llegar a las tarjetas. */
+.analysis-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px 24px;
+  margin-bottom: 4px;
+}
+.analysis-top-copy .page-intro { max-width: none; margin-top: 0; }
+.analysis-top .analysis-notice { max-width: none; margin-bottom: 0; }
 .analysis-risk {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
-  max-width: 900px;
-  margin-bottom: 18px;
+  max-width: none;
+  margin-bottom: 0;
   padding: 13px 16px;
   border: 1px solid rgba(255, 93, 93, 0.38);
   border-radius: 14px;
@@ -603,18 +613,22 @@ main.view:not(.hidden) {
   line-height: 1.55;
 }
 .analysis-risk strong { color: var(--red); }
-.analysis-machines-title { margin-top: 26px; }
-.analysis-machines-intro { max-width: 760px; }
+
+.analysis-machines-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: 24px 0 14px;
+}
+.analysis-machines-head .analysis-machines-title { margin: 0; }
+.analysis-machines-head .analysis-machines-intro { margin: 0; max-width: 780px; }
+
 .analysis-machines {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+  align-items: start;
   margin-bottom: 26px;
-}
-@media (min-width: 900px) {
-  .analysis-machines {
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  }
 }
 .analysis-empty {
   margin: 0 0 22px;
@@ -622,7 +636,7 @@ main.view:not(.hidden) {
   font-size: 13px;
 }
 .machine-analysis-card {
-  padding: 16px 18px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
@@ -631,6 +645,15 @@ main.view:not(.hidden) {
 .machine-analysis-card.is-critical {
   border-color: rgba(255, 93, 93, 0.42);
   box-shadow: 0 10px 24px rgba(214, 47, 47, 0.08);
+}
+.machine-analysis-card.is-empty {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+.machine-analysis-empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
 }
 .machine-analysis-head {
   display: flex;
@@ -657,37 +680,48 @@ main.view:not(.hidden) {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 10px;
-  margin: 0 0 14px;
+  margin: 0 0 8px;
   color: var(--ink-soft);
   font-size: 12.5px;
 }
 .machine-analysis-trend { font-weight: 600; }
 .machine-analysis-trend.is-up { color: var(--teal); }
 .machine-analysis-trend.is-down { color: var(--ink-soft); }
+
+/* Cada suministro ocupa dos líneas en móvil y una sola fila en escritorio. */
 .machine-supply-list {
   display: flex;
   flex-direction: column;
-  gap: 13px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.machine-supply-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+.machine-supply {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name stock"
+    "bar bar"
+    "when note";
+  gap: 3px 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
 }
-.machine-supply-name { font-size: 13.5px; font-weight: 600; }
+.machine-supply:first-child { border-top: 0; padding-top: 2px; }
+.machine-supply-name { grid-area: name; font-size: 13.5px; font-weight: 600; }
 .machine-supply-stock {
+  grid-area: stock;
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--ink-soft);
+  text-align: right;
   white-space: nowrap;
 }
 .machine-supply-bar {
-  height: 6px;
-  margin: 6px 0 5px;
+  grid-area: bar;
+  display: block;
+  height: 5px;
+  margin: 3px 0 2px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.07);
   overflow: hidden;
@@ -701,23 +735,54 @@ main.view:not(.hidden) {
 }
 .machine-supply.is-warning .machine-supply-bar span { background: #d98324; }
 .machine-supply.is-critical .machine-supply-bar span { background: var(--red); }
-.machine-supply-foot {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
+.machine-supply-when {
+  grid-area: when;
   font-size: 12px;
-  color: var(--ink-soft);
+  font-weight: 600;
+  color: var(--ink);
 }
-.machine-supply-when { font-weight: 600; color: var(--ink); }
+.machine-supply-note {
+  grid-area: note;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-align: right;
+}
 .machine-supply.is-critical .machine-supply-when { color: var(--red); }
 .machine-analysis-next {
-  margin: 14px 0 0;
-  padding-top: 10px;
+  margin: 10px 0 0;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
   font-size: 12.5px;
   color: var(--ink-soft);
 }
 .machine-analysis-next strong { color: var(--ink); }
+
+@media (min-width: 1100px) {
+  .analysis-top.has-risk {
+    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+    align-items: start;
+  }
+  .analysis-machines-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 28px;
+  }
+  .analysis-machines-head .analysis-machines-intro { max-width: none; }
+
+  /* Una fila por suministro: nombre, stock, barra, fecha y acción. */
+  .machine-supply {
+    grid-template-columns: minmax(130px, 1fr) auto minmax(80px, 140px) auto minmax(0, 1.6fr);
+    grid-template-areas: "name stock bar when note";
+    align-items: center;
+    gap: 8px 14px;
+    padding: 8px 0;
+  }
+  .machine-supply:first-child { padding-top: 4px; }
+  .machine-supply-bar { margin: 0; }
+  .machine-supply-stock { text-align: left; }
+  .machine-supply-when { white-space: nowrap; }
+  .machine-supply-note { text-align: left; }
+}
 .name-prefix-filters {
   display: flex;
   flex: 1 0 100%;

@@ -1030,6 +1030,14 @@ function formatStockNumber(value) {
   return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
+// Un consumo de 0,03 al día se entiende mejor como “1 cada 30 días”.
+function formatDailyRate(rate, unit) {
+  if (!Number.isFinite(rate) || rate <= 0) return "Sin salidas";
+  if (rate >= 1) return `${formatStockNumber(rate)}${unit}/día`;
+  const days = Math.max(1, Math.round(1 / rate));
+  return `1${unit} cada ${days} ${days === 1 ? "día" : "días"}`;
+}
+
 function machineNameForProductId(productId) {
   const product = allProducts.find((item) => item.id === productId);
   const name = productMachineName(product);
@@ -1169,7 +1177,10 @@ function formatDurationDays(value) {
 const ANALYSIS_RECENT_WINDOW_DAYS = 30;
 const ANALYSIS_DEFAULT_LEAD_TIME = 7;
 const ANALYSIS_COVERAGE_SCALE_DAYS = 60;
-const ANALYSIS_SUGGESTED_COVERAGE_DAYS = 45;
+// Días mínimos de historial antes de atreverse a estimar una fecha. Sin esto,
+// una única salida se convierte en un ritmo diario falso.
+const ANALYSIS_MIN_OBSERVATION_DAYS = 7;
+const ANALYSIS_SINGLE_MOVEMENT_DAYS = 30;
 
 function analysisDayKey(value) {
   const date = new Date(value);
@@ -1224,15 +1235,28 @@ function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
   const quantity = Number(product.quantity) || 0;
   const activeDayKeys = new Set(withdrawals.map((movement) => analysisDayKey(movement.created_at)));
   const totalWithdrawn = withdrawals.reduce((sum, movement) => sum + Math.max(0, -Number(movement.quantity_delta)), 0);
-  const rateOverall = activeDayKeys.size ? totalWithdrawn / activeDayKeys.size : 0;
+  const firstWithdrawalAt = withdrawals.length
+    ? new Date(withdrawals[0].created_at).getTime()
+    : null;
+  // El ritmo se mide por día de calendario desde la primera salida. Antes se
+  // dividía solo entre los días con salida y una única retirada se convertía
+  // en “1 al día”, con fechas y cantidades absurdas.
+  const daysSinceFirst = firstWithdrawalAt === null
+    ? 0
+    : Math.max(1, (now.getTime() - firstWithdrawalAt) / 86400000);
+  const hasEnoughData = firstWithdrawalAt !== null
+    && daysSinceFirst >= ANALYSIS_MIN_OBSERVATION_DAYS
+    && (withdrawals.length >= 2 || daysSinceFirst >= ANALYSIS_SINGLE_MOVEMENT_DAYS);
+  const observedDays = Math.max(ANALYSIS_MIN_OBSERVATION_DAYS, daysSinceFirst);
+  const rateOverall = hasEnoughData ? totalWithdrawn / observedDays : 0;
 
   const recentFrom = now.getTime() - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
   const previousFrom = now.getTime() - 2 * ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+  const recentWindowDays = Math.min(ANALYSIS_RECENT_WINDOW_DAYS, observedDays);
   let recentUnits = 0;
   let previousUnits = 0;
   let recentCount = 0;
   let previousCount = 0;
-  const recentDayKeys = new Set();
 
   withdrawals.forEach((movement) => {
     const time = new Date(movement.created_at).getTime();
@@ -1240,22 +1264,20 @@ function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
     if (time >= recentFrom) {
       recentUnits += units;
       recentCount += 1;
-      recentDayKeys.add(analysisDayKey(movement.created_at));
     } else if (time >= previousFrom) {
       previousUnits += units;
       previousCount += 1;
     }
   });
 
-  const rateRecent = recentDayKeys.size ? recentUnits / recentDayKeys.size : 0;
+  const rateRecent = hasEnoughData && recentWindowDays > 0
+    ? recentUnits / recentWindowDays
+    : 0;
   const rate = rateRecent > 0 ? rateRecent : rateOverall;
   const coverageDays = rate > 0 ? quantity / rate : null;
   const depletionDate = coverageDays === null ? null : new Date(now.getTime() + coverageDays * 86400000);
   const reorderDate = depletionDate
     ? new Date(depletionDate.getTime() - leadTimeDays * 86400000)
-    : null;
-  const suggestedQuantity = rate > 0
-    ? Math.max(1, Math.ceil(rate * ANALYSIS_SUGGESTED_COVERAGE_DAYS))
     : null;
   const trendPercent = previousUnits > 0
     ? Math.round(((recentUnits - previousUnits) / previousUnits) * 100)
@@ -1266,11 +1288,12 @@ function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
     product,
     rate,
     rateOverall,
+    hasEnoughData,
+    observedDays,
     coverageDays,
     depletionDate,
     reorderDate,
     leadTimeDays,
-    suggestedQuantity,
     trendPercent,
     totalWithdrawn,
     activeDays: activeDayKeys.size,
@@ -1320,6 +1343,16 @@ function renderMachineAnalysis(forecasts, now) {
   if (!container) return;
 
   const groups = new Map();
+  // Una tarjeta por cada máquina del sistema, aunque todavía no tenga
+  // suministros o salidas: si no, parece que faltan máquinas.
+  if (Array.isArray(allMachines)) {
+    allMachines
+      .filter((machine) => machine && machine.id && machine.is_active !== false)
+      .forEach((machine) => {
+        groups.set(machine.id, { machine, supplies: [] });
+      });
+  }
+
   forecasts.forEach((forecast) => {
     const machine = forecast.product.machine || null;
     const key = machine?.id || "__none__";
@@ -1329,7 +1362,7 @@ function renderMachineAnalysis(forecasts, now) {
 
   const cards = [...groups.values()].map((group) => {
     const supplies = group.supplies
-      .filter((forecast) => forecast.rate > 0 || Number(forecast.product.quantity) === 0)
+      .filter((forecast) => forecast.rate > 0 || forecast.totalWithdrawn > 0 || Number(forecast.product.quantity) === 0)
       .sort((a, b) => {
         if (a.isCritical !== b.isCritical) return a.isCritical ? -1 : 1;
         if (a.depletionDate && b.depletionDate) return a.depletionDate - b.depletionDate;
@@ -1341,15 +1374,16 @@ function renderMachineAnalysis(forecasts, now) {
     return {
       machine: group.machine,
       supplies,
+      hasSupplies: group.supplies.length > 0,
       summary: summariseMachine(group.supplies, now),
       criticalCount: group.supplies.filter((forecast) => forecast.isCritical).length,
     };
   })
-    .filter((card) => card.supplies.length)
     .sort((a, b) => {
       if (a.machine === null) return 1;
       if (b.machine === null) return -1;
       if (a.criticalCount !== b.criticalCount) return b.criticalCount - a.criticalCount;
+      if (a.hasSupplies !== b.hasSupplies) return a.hasSupplies ? -1 : 1;
       const aDate = a.summary.nextSupply?.depletionDate?.getTime() ?? Infinity;
       const bDate = b.summary.nextSupply?.depletionDate?.getTime() ?? Infinity;
       if (aDate !== bDate) return aDate - bDate;
@@ -1365,6 +1399,8 @@ function renderMachineAnalysis(forecasts, now) {
     });
 
   if (riskBox) {
+    const topBox = riskBox.closest(".analysis-top");
+    if (topBox) topBox.classList.toggle("has-risk", lateSupplies.length > 0);
     if (lateSupplies.length) {
       const names = lateSupplies.slice(0, 4).map((forecast) => {
         const quantity = Number(forecast.product.quantity) || 0;
@@ -1384,7 +1420,7 @@ function renderMachineAnalysis(forecasts, now) {
   }
 
   if (!cards.length) {
-    container.innerHTML = '<p class="analysis-empty">Todavía no hay salidas de stock registradas por máquina.</p>';
+    container.innerHTML = '<p class="analysis-empty">Todavía no hay máquinas ni salidas de stock registradas.</p>';
     return;
   }
 
@@ -1412,46 +1448,58 @@ function renderMachineAnalysis(forecasts, now) {
       const whenLabel = quantity === 0
         ? "Agotado"
         : coverage === null
-          ? "Sin ritmo de salida"
+          ? "Faltan datos para estimar"
           : `Se agota el ${formatForecastDate(forecast.depletionDate)}`;
       const leadLabel = `plazo ${forecast.leadTimeDays} ${forecast.leadTimeDays === 1 ? "día" : "días"}`;
-      const suggestedLabel = forecast.suggestedQuantity ? ` · sugerido ${formatStockNumber(forecast.suggestedQuantity)}${unit}` : "";
       const orderIsDue = forecast.reorderDate && forecast.reorderDate.getTime() <= now.getTime();
       const noteLabel = quantity === 0
         ? `Pedir ya · ${leadLabel}`
         : coverage === null
-          ? "Hacen falta más salidas para estimar"
+          ? "Pocas salidas registradas"
           : orderIsDue
-            ? `Pedir ya · ${leadLabel}${suggestedLabel}`
-            : `Pedir antes del ${formatForecastDate(forecast.reorderDate)} · ${leadLabel}${suggestedLabel}`;
+            ? `Pedir ya · ${leadLabel}`
+            : `Pedir antes del ${formatForecastDate(forecast.reorderDate)} · ${leadLabel}`;
 
       return `
         <li class="machine-supply${tone}">
-          <div class="machine-supply-top">
-            <span class="machine-supply-name">${escapeHtml(forecast.product.name)}</span>
-            <span class="machine-supply-stock">${formatStockNumber(quantity)}${unit}</span>
-          </div>
-          <div class="machine-supply-bar" role="presentation"><span style="width:${width.toFixed(1)}%"></span></div>
-          <div class="machine-supply-foot">
-            <span class="machine-supply-when">${escapeHtml(whenLabel)}</span>
-            <span class="machine-supply-note">${escapeHtml(noteLabel)}</span>
-          </div>
+          <span class="machine-supply-name">${escapeHtml(forecast.product.name)}</span>
+          <span class="machine-supply-stock">${formatStockNumber(quantity)}${unit}</span>
+          <span class="machine-supply-bar" role="presentation"><span style="width:${width.toFixed(1)}%"></span></span>
+          <span class="machine-supply-when">${escapeHtml(whenLabel)}</span>
+          <span class="machine-supply-note">${escapeHtml(noteLabel)}</span>
         </li>
       `;
     }).join("");
 
+    const isMachineWithoutSupplies = !card.hasSupplies;
+    const hasActivityData = supplies.length > 0;
+    const cardClass = `machine-analysis-card${card.criticalCount ? " is-critical" : ""}${hasActivityData ? "" : " is-empty"}`;
+    const metaLabel = isMachineWithoutSupplies
+      ? "Sin suministros asignados"
+      : !hasActivityData
+        ? "Sin salidas registradas todavía"
+        : "";
+    const metaMarkup = metaLabel
+      ? `<p class="machine-analysis-meta"><span>${metaLabel}</span></p>`
+      : `<p class="machine-analysis-meta">
+          ${summary.activeDays30} de ${ANALYSIS_RECENT_WINDOW_DAYS} días con actividad
+          <span class="machine-analysis-trend${trendTone}">${trendLabel}</span>
+        </p>`;
+    const bodyMarkup = hasActivityData
+      ? `<ul class="machine-supply-list">${suppliesMarkup}</ul>
+         ${summary.nextSupply ? `<p class="machine-analysis-next">Siguiente en agotarse: <strong>${escapeHtml(summary.nextSupply.product.name)}</strong></p>` : ""}`
+      : isMachineWithoutSupplies
+        ? '<p class="machine-analysis-empty">Asigna suministros a esta máquina para ver su previsión.</p>'
+        : "";
+
     return `
-      <article class="machine-analysis-card${card.criticalCount ? " is-critical" : ""}">
+      <article class="${cardClass}">
         <header class="machine-analysis-head">
           <h4>${escapeHtml(name)}</h4>
           ${summary.streak ? '<span class="machine-analysis-badge">En racha</span>' : ""}
         </header>
-        <p class="machine-analysis-meta">
-          ${summary.activeDays30} de ${ANALYSIS_RECENT_WINDOW_DAYS} días con actividad
-          <span class="machine-analysis-trend${trendTone}">${trendLabel}</span>
-        </p>
-        <ul class="machine-supply-list">${suppliesMarkup}</ul>
-        ${summary.nextSupply ? `<p class="machine-analysis-next">Siguiente en agotarse: <strong>${escapeHtml(summary.nextSupply.product.name)}</strong></p>` : ""}
+        ${metaMarkup}
+        ${bodyMarkup}
       </article>
     `;
   }).join("");
@@ -1569,13 +1617,13 @@ async function loadStockAnalytics() {
       const unit = row.product.unit ? ` ${escapeHtml(row.product.unit)}` : "";
       const quantity = Number(row.product.quantity) || 0;
       const coverage = forecast?.coverageDays ?? null;
-      const rateLabel = forecast && forecast.rate > 0
-        ? `${formatStockNumber(forecast.rate)}${unit}/día de trabajo`
-        : "Sin salidas";
+      const rateLabel = forecast && forecast.rate <= 0 && forecast.totalWithdrawn > 0
+        ? "Faltan datos"
+        : formatDailyRate(forecast?.rate ?? 0, unit);
       const whenLabel = quantity === 0
         ? "AGOTADO"
         : coverage === null
-          ? "Sin estimación"
+          ? "Faltan datos"
           : `${formatForecastDate(forecast.depletionDate)} · ${formatDurationDays(coverage)}`;
 
       return `

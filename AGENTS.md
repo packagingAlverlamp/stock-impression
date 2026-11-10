@@ -102,6 +102,9 @@ en el servidor y no solo en el formulario.
   - Auditoría de botones: helper `withBusy`, `flashSuccess`, CSS
     `.btn:disabled` + spinner, bloqueo de modales duplicados y feedback en las
     acciones principales (tabla completa en `PLAN_PEDIDOS.md`, sección 8).
+- El equipo nunca pide más de 5 unidades por pedido. Por eso Análisis no
+  propone cantidades de compra: solo avisa de cuándo toca pedir. La cifra
+  “sugerido 45” se retiró el 10/11/2026.
 
 
 ## Estado del trabajo
@@ -360,29 +363,42 @@ en el servidor y no solo en el formulario.
     sigue a 900 px) y mantiene la alineación a la izquierda.
   - Verificado con datos simulados a 1440, 1100, 900 y 500 px sin errores de
     consola.
-- Previsión de consumo por máquina (10/11/2026):
+- Previsión de consumo por máquina (10/11/2026, corregida el 10/11/2026):
   - Nuevo bloque **Consumo por máquina** en Análisis, encima de la tabla, con
-    una tarjeta por máquina ordenada por urgencia y una tarjeta final “Sin
-    máquina”.
-  - **Ritmo en días de trabajo**: unidades salidas ÷ días distintos con alguna
-    salida, no días de calendario. Se usa el ritmo de los últimos 30 días si
-    hay datos; si no, el histórico.
+    una tarjeta por cada máquina activa (aunque no tenga suministros o
+    salidas), ordenada por urgencia, y una tarjeta final “Sin máquina”.
+  - **Ritmo por día de calendario**: unidades salidas ÷ días transcurridos
+    desde la primera salida (o los últimos 30 días si hay más historial), no
+    por día de trabajo. Se corrigió porque dividir entre los días con salida
+    convertía una única retirada en “1 al día” y generaba fechas absurdas
+    (por ejemplo, “Tinta Amarillo 2: se agota el 12 nov” con una sola salida).
+  - **Umbral mínimo de datos**: 7 días de historial y al menos 2 salidas, o
+    30 días con una sola salida. Por debajo, el suministro muestra “Faltan
+    datos para estimar” y no se inventa fecha ni cantidad.
+  - **Sin cantidad sugerida**: se eliminó el “sugerido 45” porque el equipo
+    nunca pide más de 5 unidades por pedido. El aviso solo indica cuándo toca
+    pedir.
   - **Plazo real por proveedor** medido con `purchase_orders`
     (`sent_at` → `closed_at`), media de los últimos 300 pedidos cerrados y
     7 días por defecto cuando no hay histórico. Calculado en
     `loadSupplierLeadTimes()`.
   - Por suministro: fecha de agotamiento, **punto de pedido** (agotamiento
-    menos plazo), **cantidad sugerida** para 45 días y aviso “Pedir ya” cuando
-    la fecha de pedido ya pasó. Barra de 0 a 60 días con semáforo (rojo si se
-    agota antes de que llegue el pedido, ámbar por debajo de 21 días).
+    menos plazo) y aviso “Pedir ya” cuando la fecha de pedido ya pasó. Barra
+    de 0 a 60 días con semáforo (rojo si se agota antes de que llegue el
+    pedido, ámbar por debajo de 21 días).
   - Por máquina: días con actividad de los últimos 30, tendencia de actividad
     (salidas de 30 días frente a los 30 anteriores) y etiqueta **En racha**
     con 3 o más días activos en la última semana y tendencia ≥ 20 %.
   - **Banner de riesgo** con los suministros que se agotan antes de que llegue
     el pedido, con su fecha.
-  - La tabla inferior usa el mismo cálculo para no contradecir las tarjetas:
-    columnas “Ritmo de consumo” (por día de trabajo) y “Se agota”
+  - La tabla inferior usa el mismo cálculo: “Ritmo de consumo” (media diaria;
+    se muestra como “1 cada N días” cuando es menor que 1) y “Se agota”
     (fecha + días). Se ordena por la fecha de agotamiento.
+  - **Ancho completo en escritorio (≥1100 px)**: la intro y el aviso de riesgo
+    van en dos columnas, la cabecera “Consumo por máquina” va en una sola
+    línea, cada máquina ocupa una tarjeta a todo el ancho y cada suministro se
+    muestra en una fila (nombre, stock, barra, fecha y acción). En móvil el
+    suministro vuelve a dos líneas.
   - Todo se calcula en el navegador con los movimientos ya cargados; sin
     tablas ni migraciones nuevas.
   - Verificado con datos simulados a 1440 y 500 px, sin errores de consola.
