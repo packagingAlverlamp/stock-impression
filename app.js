@@ -1163,6 +1163,300 @@ function formatDurationDays(value) {
   return `${rounded} ${rounded === 1 ? "día" : "días"}`;
 }
 
+// ---------------------------------------------------------------
+// Previsión de consumo por máquina
+// ---------------------------------------------------------------
+const ANALYSIS_RECENT_WINDOW_DAYS = 30;
+const ANALYSIS_DEFAULT_LEAD_TIME = 7;
+const ANALYSIS_COVERAGE_SCALE_DAYS = 60;
+const ANALYSIS_SUGGESTED_COVERAGE_DAYS = 45;
+
+function analysisDayKey(value) {
+  const date = new Date(value);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function formatForecastDate(date) {
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short" }).format(date);
+}
+
+// Plazo real de cada proveedor: media de días entre el envío del pedido y su
+// recepción completa, calculada con los pedidos ya cerrados.
+async function loadSupplierLeadTimes() {
+  const leadTimes = new Map();
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("purchase_orders")
+      .select("supplier_id, sent_at, closed_at")
+      .not("sent_at", "is", null)
+      .not("closed_at", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error || !Array.isArray(data)) return leadTimes;
+
+    const totals = new Map();
+    data.forEach((order) => {
+      const start = new Date(order.sent_at).getTime();
+      const end = new Date(order.closed_at).getTime();
+      const days = (end - start) / 86400000;
+      if (!Number.isFinite(days) || days < 0 || days > 120) return;
+      const key = order.supplier_id || "__none__";
+      const entry = totals.get(key) || { sum: 0, count: 0 };
+      entry.sum += days;
+      entry.count += 1;
+      totals.set(key, entry);
+    });
+
+    totals.forEach((entry, key) => {
+      leadTimes.set(key, Math.max(1, Math.round(entry.sum / entry.count)));
+    });
+  } catch (error) {
+    console.warn("No se pudieron calcular los plazos de entrega:", error);
+  }
+
+  return leadTimes;
+}
+
+function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
+  const quantity = Number(product.quantity) || 0;
+  const activeDayKeys = new Set(withdrawals.map((movement) => analysisDayKey(movement.created_at)));
+  const totalWithdrawn = withdrawals.reduce((sum, movement) => sum + Math.max(0, -Number(movement.quantity_delta)), 0);
+  const rateOverall = activeDayKeys.size ? totalWithdrawn / activeDayKeys.size : 0;
+
+  const recentFrom = now.getTime() - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+  const previousFrom = now.getTime() - 2 * ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+  let recentUnits = 0;
+  let previousUnits = 0;
+  let recentCount = 0;
+  let previousCount = 0;
+  const recentDayKeys = new Set();
+
+  withdrawals.forEach((movement) => {
+    const time = new Date(movement.created_at).getTime();
+    const units = Math.max(0, -Number(movement.quantity_delta));
+    if (time >= recentFrom) {
+      recentUnits += units;
+      recentCount += 1;
+      recentDayKeys.add(analysisDayKey(movement.created_at));
+    } else if (time >= previousFrom) {
+      previousUnits += units;
+      previousCount += 1;
+    }
+  });
+
+  const rateRecent = recentDayKeys.size ? recentUnits / recentDayKeys.size : 0;
+  const rate = rateRecent > 0 ? rateRecent : rateOverall;
+  const coverageDays = rate > 0 ? quantity / rate : null;
+  const depletionDate = coverageDays === null ? null : new Date(now.getTime() + coverageDays * 86400000);
+  const reorderDate = depletionDate
+    ? new Date(depletionDate.getTime() - leadTimeDays * 86400000)
+    : null;
+  const suggestedQuantity = rate > 0
+    ? Math.max(1, Math.ceil(rate * ANALYSIS_SUGGESTED_COVERAGE_DAYS))
+    : null;
+  const trendPercent = previousUnits > 0
+    ? Math.round(((recentUnits - previousUnits) / previousUnits) * 100)
+    : null;
+  const isCritical = quantity === 0 || (coverageDays !== null && coverageDays <= leadTimeDays);
+
+  return {
+    product,
+    rate,
+    rateOverall,
+    coverageDays,
+    depletionDate,
+    reorderDate,
+    leadTimeDays,
+    suggestedQuantity,
+    trendPercent,
+    totalWithdrawn,
+    activeDays: activeDayKeys.size,
+    activeDayKeys,
+    recentCount,
+    previousCount,
+    isCritical,
+  };
+}
+
+function summariseMachine(supplies, now) {
+  const activeDays = new Set();
+  let recentCount = 0;
+  let previousCount = 0;
+
+  supplies.forEach((forecast) => {
+    forecast.activeDayKeys.forEach((key) => activeDays.add(key));
+    recentCount += forecast.recentCount;
+    previousCount += forecast.previousCount;
+  });
+
+  const recentFrom = now.getTime() - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+  const weekFrom = now.getTime() - 7 * 86400000;
+  let activeDays30 = 0;
+  let activeDays7 = 0;
+
+  activeDays.forEach((key) => {
+    const time = new Date(`${key}T00:00:00Z`).getTime();
+    if (time >= recentFrom) activeDays30 += 1;
+    if (time >= weekFrom) activeDays7 += 1;
+  });
+
+  const trendPercent = previousCount > 0
+    ? Math.round(((recentCount - previousCount) / previousCount) * 100)
+    : null;
+  const streak = activeDays7 >= 3 && (trendPercent === null ? true : trendPercent >= 20);
+  const nextSupply = supplies
+    .filter((forecast) => forecast.depletionDate)
+    .sort((a, b) => a.depletionDate - b.depletionDate)[0] || null;
+
+  return { activeDays30, activeDays7, recentCount, previousCount, trendPercent, streak, nextSupply };
+}
+
+function renderMachineAnalysis(forecasts, now) {
+  const container = $("analysis-machines");
+  const riskBox = $("analysis-risk");
+  if (!container) return;
+
+  const groups = new Map();
+  forecasts.forEach((forecast) => {
+    const machine = forecast.product.machine || null;
+    const key = machine?.id || "__none__";
+    if (!groups.has(key)) groups.set(key, { machine, supplies: [] });
+    groups.get(key).supplies.push(forecast);
+  });
+
+  const cards = [...groups.values()].map((group) => {
+    const supplies = group.supplies
+      .filter((forecast) => forecast.rate > 0 || Number(forecast.product.quantity) === 0)
+      .sort((a, b) => {
+        if (a.isCritical !== b.isCritical) return a.isCritical ? -1 : 1;
+        if (a.depletionDate && b.depletionDate) return a.depletionDate - b.depletionDate;
+        if (a.depletionDate) return -1;
+        if (b.depletionDate) return 1;
+        return a.product.name.localeCompare(b.product.name, "es");
+      });
+
+    return {
+      machine: group.machine,
+      supplies,
+      summary: summariseMachine(group.supplies, now),
+      criticalCount: group.supplies.filter((forecast) => forecast.isCritical).length,
+    };
+  })
+    .filter((card) => card.supplies.length)
+    .sort((a, b) => {
+      if (a.machine === null) return 1;
+      if (b.machine === null) return -1;
+      if (a.criticalCount !== b.criticalCount) return b.criticalCount - a.criticalCount;
+      const aDate = a.summary.nextSupply?.depletionDate?.getTime() ?? Infinity;
+      const bDate = b.summary.nextSupply?.depletionDate?.getTime() ?? Infinity;
+      if (aDate !== bDate) return aDate - bDate;
+      return (a.machine.name || "").localeCompare(b.machine.name || "", "es");
+    });
+
+  const lateSupplies = forecasts
+    .filter((forecast) => forecast.isCritical)
+    .sort((a, b) => {
+      const aDate = a.depletionDate?.getTime() ?? -Infinity;
+      const bDate = b.depletionDate?.getTime() ?? -Infinity;
+      return aDate - bDate;
+    });
+
+  if (riskBox) {
+    if (lateSupplies.length) {
+      const names = lateSupplies.slice(0, 4).map((forecast) => {
+        const quantity = Number(forecast.product.quantity) || 0;
+        const when = quantity === 0 ? "agotado" : `se agota el ${formatForecastDate(forecast.depletionDate)}`;
+        return `${escapeHtml(forecast.product.name)} (${when})`;
+      });
+      const extra = lateSupplies.length > 4 ? ` y ${lateSupplies.length - 4} más` : "";
+      riskBox.classList.remove("hidden");
+      riskBox.innerHTML = `
+        <strong>${lateSupplies.length} ${lateSupplies.length === 1 ? "suministro se agota" : "suministros se agotan"} antes de que llegue el pedido.</strong>
+        <span>${names.join(", ")}${extra}.</span>
+      `;
+    } else {
+      riskBox.classList.add("hidden");
+      riskBox.innerHTML = "";
+    }
+  }
+
+  if (!cards.length) {
+    container.innerHTML = '<p class="analysis-empty">Todavía no hay salidas de stock registradas por máquina.</p>';
+    return;
+  }
+
+  container.innerHTML = cards.map((card) => {
+    const { machine, supplies, summary } = card;
+    const name = machine?.name || "Sin máquina";
+    const trend = summary.trendPercent;
+    const trendLabel = trend === null
+      ? "Sin actividad en el periodo anterior"
+      : trend === 0
+        ? "Actividad estable"
+        : `${trend > 0 ? "▲" : "▼"} ${Math.abs(trend)} % de actividad`;
+    const trendTone = trend === null ? "" : trend > 0 ? " is-up" : trend < 0 ? " is-down" : "";
+
+    const suppliesMarkup = supplies.map((forecast) => {
+      const quantity = Number(forecast.product.quantity) || 0;
+      const unit = forecast.product.unit ? ` ${escapeHtml(forecast.product.unit)}` : "";
+      const coverage = forecast.coverageDays;
+      const width = coverage === null ? 0 : Math.max(6, Math.min(100, (coverage / ANALYSIS_COVERAGE_SCALE_DAYS) * 100));
+      const tone = quantity === 0 || (coverage !== null && coverage <= forecast.leadTimeDays)
+        ? " is-critical"
+        : coverage !== null && coverage < 21
+          ? " is-warning"
+          : " is-ok";
+      const whenLabel = quantity === 0
+        ? "Agotado"
+        : coverage === null
+          ? "Sin ritmo de salida"
+          : `Se agota el ${formatForecastDate(forecast.depletionDate)}`;
+      const leadLabel = `plazo ${forecast.leadTimeDays} ${forecast.leadTimeDays === 1 ? "día" : "días"}`;
+      const suggestedLabel = forecast.suggestedQuantity ? ` · sugerido ${formatStockNumber(forecast.suggestedQuantity)}${unit}` : "";
+      const orderIsDue = forecast.reorderDate && forecast.reorderDate.getTime() <= now.getTime();
+      const noteLabel = quantity === 0
+        ? `Pedir ya · ${leadLabel}`
+        : coverage === null
+          ? "Hacen falta más salidas para estimar"
+          : orderIsDue
+            ? `Pedir ya · ${leadLabel}${suggestedLabel}`
+            : `Pedir antes del ${formatForecastDate(forecast.reorderDate)} · ${leadLabel}${suggestedLabel}`;
+
+      return `
+        <li class="machine-supply${tone}">
+          <div class="machine-supply-top">
+            <span class="machine-supply-name">${escapeHtml(forecast.product.name)}</span>
+            <span class="machine-supply-stock">${formatStockNumber(quantity)}${unit}</span>
+          </div>
+          <div class="machine-supply-bar" role="presentation"><span style="width:${width.toFixed(1)}%"></span></div>
+          <div class="machine-supply-foot">
+            <span class="machine-supply-when">${escapeHtml(whenLabel)}</span>
+            <span class="machine-supply-note">${escapeHtml(noteLabel)}</span>
+          </div>
+        </li>
+      `;
+    }).join("");
+
+    return `
+      <article class="machine-analysis-card${card.criticalCount ? " is-critical" : ""}">
+        <header class="machine-analysis-head">
+          <h4>${escapeHtml(name)}</h4>
+          ${summary.streak ? '<span class="machine-analysis-badge">En racha</span>' : ""}
+        </header>
+        <p class="machine-analysis-meta">
+          ${summary.activeDays30} de ${ANALYSIS_RECENT_WINDOW_DAYS} días con actividad
+          <span class="machine-analysis-trend${trendTone}">${trendLabel}</span>
+        </p>
+        <ul class="machine-supply-list">${suppliesMarkup}</ul>
+        ${summary.nextSupply ? `<p class="machine-analysis-next">Siguiente en agotarse: <strong>${escapeHtml(summary.nextSupply.product.name)}</strong></p>` : ""}
+      </article>
+    `;
+  }).join("");
+}
+
 function buildProductConsumptionStats(product, movements, now) {
   const events = movements
     .filter((movement) => movement.product_id === product.id)
@@ -1218,10 +1512,17 @@ function buildProductConsumptionStats(product, movements, now) {
 
 async function loadStockAnalytics() {
   const tbody = $("analysis-table-body");
+  const machinesContainer = $("analysis-machines");
   tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">Calculando análisis…</td></tr>';
+  if (machinesContainer) {
+    machinesContainer.innerHTML = '<p class="analysis-empty">Calculando el consumo por máquina…</p>';
+  }
 
   try {
-    const movements = await loadAllStockMovements();
+    const [movements, leadTimes] = await Promise.all([
+      loadAllStockMovements(),
+      loadSupplierLeadTimes(),
+    ]);
     const earliestMovement = movements[0];
     $("analysis-start-date").textContent = earliestMovement
       ? new Intl.DateTimeFormat("es-ES", { dateStyle: "long" }).format(new Date(earliestMovement.created_at))
@@ -1229,33 +1530,73 @@ async function loadStockAnalytics() {
 
     if (!allProducts.length) {
       tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">No hay suministros para analizar.</td></tr>';
+      if (machinesContainer) {
+        machinesContainer.innerHTML = '<p class="analysis-empty">No hay suministros para analizar.</p>';
+      }
       return;
     }
 
     const now = new Date();
-    const rows = allProducts
-      .map((product) => buildProductConsumptionStats(product, movements, now))
-      .sort((a, b) => {
-        if (a.coverageDays === null) return b.coverageDays === null ? a.product.name.localeCompare(b.product.name) : 1;
-        if (b.coverageDays === null) return -1;
-        return a.coverageDays - b.coverageDays;
-      });
+    const withdrawalsByProduct = new Map();
+    movements.forEach((movement) => {
+      if (movement.movement_type !== "withdrawal") return;
+      const list = withdrawalsByProduct.get(movement.product_id);
+      if (list) list.push(movement);
+      else withdrawalsByProduct.set(movement.product_id, [movement]);
+    });
 
-    tbody.innerHTML = rows.map((stats) => `
+    const forecasts = allProducts.map((product) => buildSupplyForecast(
+      product,
+      withdrawalsByProduct.get(product.id) || [],
+      now,
+      leadTimes.get(product.supplier_id || "__none__") ?? ANALYSIS_DEFAULT_LEAD_TIME
+    ));
+    const stats = allProducts.map((product) => buildProductConsumptionStats(product, movements, now));
+    const forecastById = new Map(forecasts.map((forecast) => [forecast.product.id, forecast]));
+
+    renderMachineAnalysis(forecasts, now);
+
+    stats.sort((a, b) => {
+      const aCoverage = forecastById.get(a.product.id)?.coverageDays ?? null;
+      const bCoverage = forecastById.get(b.product.id)?.coverageDays ?? null;
+      if (aCoverage === null) return bCoverage === null ? a.product.name.localeCompare(b.product.name) : 1;
+      if (bCoverage === null) return -1;
+      return aCoverage - bCoverage;
+    });
+
+    tbody.innerHTML = stats.map((row) => {
+      const forecast = forecastById.get(row.product.id);
+      const unit = row.product.unit ? ` ${escapeHtml(row.product.unit)}` : "";
+      const quantity = Number(row.product.quantity) || 0;
+      const coverage = forecast?.coverageDays ?? null;
+      const rateLabel = forecast && forecast.rate > 0
+        ? `${formatStockNumber(forecast.rate)}${unit}/día de trabajo`
+        : "Sin salidas";
+      const whenLabel = quantity === 0
+        ? "AGOTADO"
+        : coverage === null
+          ? "Sin estimación"
+          : `${formatForecastDate(forecast.depletionDate)} · ${formatDurationDays(coverage)}`;
+
+      return `
       <tr>
-        <td data-label="Suministro" class="movement-product-cell">${escapeHtml(stats.product.name)}</td>
-        <td data-label="Máquina" class="movement-machine-cell">${escapeHtml(stats.product.machine?.name || "—")}</td>
-        <td data-label="Stock actual">${formatStockNumber(stats.product.quantity)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}</td>
-        <td data-label="Entradas">${formatStockNumber(stats.incoming)}</td>
-        <td data-label="Salidas">${formatStockNumber(stats.outgoing)}</td>
-        <td data-label="Agotamientos">${stats.exhaustionCount}</td>
-        <td data-label="Media entre agotamientos">${stats.averageExhaustionInterval === null ? "Aún sin media" : formatDurationDays(stats.averageExhaustionInterval)}</td>
-        <td data-label="Consumo diario medio">${stats.dailyAverage === null ? "Datos insuficientes" : `${formatStockNumber(stats.dailyAverage)}${stats.product.unit ? ` ${escapeHtml(stats.product.unit)}` : ""}/día`}</td>
-        <td data-label="Stock estimado" class="${Number(stats.product.quantity) === 0 || (stats.coverageDays !== null && stats.coverageDays < 7) ? "analysis-low-coverage" : ""}">${Number(stats.product.quantity) === 0 ? "AGOTADO" : stats.coverageDays === null ? "Sin estimación" : formatDurationDays(stats.coverageDays)}</td>
+        <td data-label="Suministro" class="movement-product-cell">${escapeHtml(row.product.name)}</td>
+        <td data-label="Máquina" class="movement-machine-cell">${escapeHtml(row.product.machine?.name || "—")}</td>
+        <td data-label="Stock actual">${formatStockNumber(row.product.quantity)}${unit}</td>
+        <td data-label="Entradas">${formatStockNumber(row.incoming)}</td>
+        <td data-label="Salidas">${formatStockNumber(row.outgoing)}</td>
+        <td data-label="Agotamientos">${row.exhaustionCount}</td>
+        <td data-label="Media entre agotamientos">${row.averageExhaustionInterval === null ? "Aún sin media" : formatDurationDays(row.averageExhaustionInterval)}</td>
+        <td data-label="Ritmo de consumo">${rateLabel}</td>
+        <td data-label="Se agota" class="${quantity === 0 || (coverage !== null && coverage <= (forecast?.leadTimeDays || ANALYSIS_DEFAULT_LEAD_TIME)) ? "analysis-low-coverage" : ""}">${whenLabel}</td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
   } catch (error) {
     tbody.innerHTML = '<tr><td colspan="9" class="table-empty-cell">No se pudo cargar el análisis de consumo.</td></tr>';
+    if (machinesContainer) {
+      machinesContainer.innerHTML = '<p class="analysis-empty">No se pudo calcular el consumo por máquina.</p>';
+    }
     showToast("Error al calcular el análisis: " + error.message);
   }
 }
