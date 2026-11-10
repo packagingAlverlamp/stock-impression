@@ -342,28 +342,36 @@
           <button type="button" id="order-clear" class="btn btn-outline">Vaciar pedido</button>
         </div>
 
-        <div class="order-low-header">
-          <h3 class="section-subtitle">Queda poco</h3>
-          <span id="order-low-count" class="order-low-count"></span>
+        <div class="order-new-layout">
+          <div class="order-new-col order-new-col-main">
+            <div class="order-low-header">
+              <h3 class="section-subtitle">Queda poco</h3>
+              <span id="order-low-count" class="order-low-count"></span>
+            </div>
+            <p class="page-intro order-low-intro">Marca los suministros que quieras pedir. Al añadir el primero se fija el proveedor del pedido.</p>
+
+            <div id="order-product-picker" class="order-product-picker"></div>
+
+            <button type="button" id="order-add-manual" class="btn btn-outline order-add-manual">+ Añadir otro suministro</button>
+          </div>
+
+          <aside class="order-new-col order-new-col-side">
+            <h3 class="section-subtitle">Pedido</h3>
+            <div id="order-cart" class="order-cart"></div>
+            <div id="order-cart-empty" class="empty-state order-cart-empty">Marca un suministro de la lista o añádelo a mano.</div>
+
+            <div class="field">
+              <label for="order-note">Observaciones</label>
+              <textarea id="order-note" rows="3" placeholder="Plazo, urgencia, referencias alternativas..."></textarea>
+            </div>
+
+            <div class="order-summary" id="order-summary">0 referencias · 0 unidades</div>
+            <div class="order-actions">
+              <button type="button" id="order-save-draft" class="btn btn-outline">Guardar borrador</button>
+              <button type="button" id="order-send" class="btn btn-primary" disabled>Enviar pedido</button>
+            </div>
+          </aside>
         </div>
-        <p class="page-intro order-low-intro">Marca los suministros que quieras pedir. Al añadir el primero se fija el proveedor del pedido.</p>
-
-        <div id="order-product-picker" class="order-product-picker"></div>
-
-        <button type="button" id="order-add-manual" class="btn btn-outline order-add-manual">+ Añadir otro suministro</button>
-
-        <h3 class="section-subtitle">Pedido</h3>
-        <div id="order-cart" class="order-cart"></div>
-        <div id="order-cart-empty" class="empty-state order-cart-empty">Marca un suministro de la lista o añádelo a mano.</div>
-
-        <div class="field">
-          <label for="order-note">Observaciones</label>
-          <textarea id="order-note" rows="3" placeholder="Plazo, urgencia, referencias alternativas..."></textarea>
-        </div>
-
-        <div class="order-summary" id="order-summary">0 referencias · 0 unidades</div>
-        <button type="button" id="order-save-draft" class="btn btn-outline">Guardar borrador</button>
-        <button type="button" id="order-send" class="btn btn-primary" disabled>Enviar pedido</button>
       </section>
 
       <section id="orders-panel-tracking" class="orders-panel hidden">

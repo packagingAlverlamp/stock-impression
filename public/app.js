@@ -1740,9 +1740,13 @@ function renderServiceRequests() {
         ${photos.length ? `
           <div class="service-request-photos">
             ${photos.map((url, index) => `
-              <a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir foto ${index + 1}">
+              <button type="button" class="service-photo-btn"
+                data-photo-url="${escapeHtml(url)}"
+                data-photo-label="Foto ${index + 1} de ${photos.length} · ${escapeHtml(request.machine_name)}"
+                title="Ampliar foto ${index + 1}"
+                aria-label="Ampliar foto ${index + 1} de ${photos.length} de la solicitud de ${escapeHtml(request.machine_name)}">
                 <img src="${escapeHtml(url)}" alt="Foto ${index + 1} de la solicitud" loading="lazy" />
-              </a>
+              </button>
             `).join("")}
           </div>
         ` : ""}
@@ -1776,9 +1780,48 @@ function renderServiceRequests() {
   container.querySelectorAll(".service-status-select").forEach((select) => {
     select.addEventListener("change", () => updateServiceRequestStatus(select.dataset.requestId, select.value));
   });
+  container.querySelectorAll(".service-photo-btn").forEach((button) => {
+    button.addEventListener("click", () => openPhotoLightbox(button.dataset.photoUrl, button.dataset.photoLabel));
+  });
   container.querySelectorAll(".service-retry-btn").forEach((button) => {
     button.addEventListener("click", () => withBusy(button, "Enviando…", () => retryServiceRequestEmail(button.dataset.requestId)));
   });
+}
+
+function openPhotoLightbox(url, label) {
+  if (!url) return;
+  const previousFocus = document.activeElement;
+  const caption = label || "Foto de la solicitud";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop centered photo-lightbox";
+  backdrop.innerHTML = `
+    <div class="photo-lightbox-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(caption)}">
+      <button type="button" class="photo-lightbox-close" aria-label="Cerrar la foto">&times;</button>
+      <img src="${escapeHtml(url)}" alt="${escapeHtml(caption)}" />
+      <p class="photo-lightbox-caption">${escapeHtml(caption)}</p>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const onKey = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+    }
+  };
+
+  function close() {
+    document.removeEventListener("keydown", onKey);
+    backdrop.remove();
+    if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+  }
+
+  backdrop.querySelector(".photo-lightbox-close").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  document.addEventListener("keydown", onKey);
+  backdrop.querySelector(".photo-lightbox-close").focus();
 }
 
 async function updateServiceRequestStatus(requestId, status) {
@@ -2316,7 +2359,7 @@ function renderCategoryPills() {
       </div>
       <label class="mobile-category-select-wrap">
         <select id="mobile-category-select" class="mobile-category-select">
-          <option value="">Selecciona una categoría</option>
+          <option value="">Selecciona una máquina</option>
           ${categoryOptions.map((cat) => {
             const selected = activeCategoryFilter === cat;
             const catCount = allProducts.filter((p) => p.category === cat).length;
@@ -2508,7 +2551,7 @@ function renderProductList() {
     const groups = finalFiltered.reduce((acc, p) => {
       const key = activeCategoryFilter === LOW_STOCK_CATEGORY_KEY
         ? 'Poco stock'
-        : p.category || 'Sin categoría';
+        : p.category || 'Sin máquina';
       acc[key] = acc[key] || [];
       acc[key].push(p);
       return acc;
@@ -2751,7 +2794,7 @@ async function checkLowStock(product) {
 
 function buildLowStockEmailHtml(product) {
   const unit = product.unit || "uds";
-  const category = product.category || "Sin categoría";
+  const category = product.category || "Sin máquina";
   const supplier = product.supplier;
   const supplierName = supplier?.name || "Sin proveedor";
   const supplierEmails = (supplier?.email || "")
@@ -2809,7 +2852,7 @@ async function sendLowStockEmail(product) {
       .map((email) => email.trim())
       .filter(Boolean);
     const supplierSummary = [supplier?.name, supplierEmails.length ? supplierEmails.join("; ") : supplier?.email, supplier?.phone].filter(Boolean).join(" • ") || "Sin proveedor";
-    const category = product.category || "Sin categoría";
+    const category = product.category || "Sin máquina";
     const subject = `Stock bajo: ${product.name}`;
     const message = [
       `El suministro \"${product.name}\" está por debajo del mínimo.`,

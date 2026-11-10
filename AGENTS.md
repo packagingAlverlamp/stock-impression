@@ -325,6 +325,41 @@ en el servidor y no solo en el formulario.
   - Verificado simulando el build sin entorno: preview pasa y producción
     falla como debe. La rama de Dependabot se actualizó con `main` y su
     preview vuelve a construir.
+- Visor de fotos de servicio técnico (10/11/2026):
+  - Las miniaturas de `renderServiceRequests` dejan de ser `<a target="_blank">`
+    y pasan a ser `<button class="service-photo-btn">` con
+    `data-photo-url` y `data-photo-label` (“Foto N de M · máquina”).
+  - `openPhotoLightbox(url, label)` abre un `.modal-backdrop.centered.photo-lightbox`
+    con la imagen ampliada, leyenda y botón de cerrar. Cierra con el botón,
+    con clic en el fondo y con `Escape`; guarda y restaura el foco.
+  - El CSS del visor está al final de `style.css` (gana a `.modal-backdrop`):
+    fondo `rgba(11, 14, 19, 0.86)`, `z-index: 80`, imagen
+    `max-height: calc(100vh - 130px)` y cierre fijo arriba a la derecha.
+  - Verificado con datos simulados: 3 miniaturas tipo button, apertura y
+    cierre por botón/Escape/fondo, foco en cerrar y sin errores de consola.
+- Desplegables con chevron propio (10/11/2026):
+  - Regla global `select` con `appearance: none`, chevron SVG en
+    `background-position: right 12px center` y `padding-right: 38px`, para que
+    el indicador no dependa del navegador ni pise el texto.
+  - `.mobile-category-select` (Inventario en móvil) pasa a 46 px de alto, con
+    el chevron a 13 px y `padding-right: 40px`; los botones “Todos” y “Poco
+    stock” también a 46 px para que la fila quede uniforme.
+  - `.history-filters select` (Registro y Seguimiento de pedidos) y
+    `.service-status-control select` reciben el mismo tratamiento.
+  - Se sustituye el texto visible “categoría” por “máquina”: “Selecciona una
+    máquina” y “Sin máquina”.
+- Nuevo pedido en dos columnas (10/11/2026):
+  - `.order-new-layout` divide el panel en escritorio (≥1100 px): a la
+    izquierda “Queda poco”, el buscador y “Añadir otro suministro”; a la
+    derecha “Pedido” con el carrito, observaciones, resumen y los botones
+    “Guardar borrador” / “Enviar pedido”.
+  - La columna derecha lleva `border-left` y 30 px de aire a cada lado; las
+    dos cabeceras arrancan a la misma altura. Por debajo de 1100 px se apila
+    en el orden anterior.
+  - `#orders-panel-new` sube a 1180 px de ancho en escritorio (el seguimiento
+    sigue a 900 px) y mantiene la alineación a la izquierda.
+  - Verificado con datos simulados a 1440, 1100, 900 y 500 px sin errores de
+    consola.
 
 ### Pendiente
 
