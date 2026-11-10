@@ -94,11 +94,11 @@
     <form id="form-reset-password" class="hidden">
       <div class="field">
         <label for="reset-password">Nueva contraseña</label>
-        <input type="password" id="reset-password" required minlength="6" autocomplete="new-password" />
+        <input type="password" id="reset-password" required minlength="10" autocomplete="new-password" />
       </div>
       <div class="field">
         <label for="reset-password-confirm">Confirmar nueva contraseña</label>
-        <input type="password" id="reset-password-confirm" required minlength="6" autocomplete="new-password" />
+        <input type="password" id="reset-password-confirm" required minlength="10" autocomplete="new-password" />
       </div>
       <button type="submit" class="btn btn-primary">Guardar contraseña</button>
       <button type="button" id="cancel-reset-password" class="btn btn-outline" style="margin-top:10px">Volver</button>
@@ -113,9 +113,20 @@
       </div>
       <div class="field">
         <label for="register-password">Contraseña</label>
-        <input type="password" id="register-password" required minlength="6" autocomplete="new-password" />
+        <input type="password" id="register-password" required minlength="10" autocomplete="new-password" />
       </div>
       <button type="submit" class="btn btn-teal">Crear cuenta</button>
+    </form>
+
+    <!-- Verificación en dos pasos (TOTP) -->
+    <form id="form-mfa" class="hidden">
+      <p class="auth-hint">Tu cuenta tiene la verificación en dos pasos activada. Escribe el código de 6 dígitos de tu aplicación de autenticación.</p>
+      <div class="field">
+        <label for="mfa-code">Código de verificación</label>
+        <input type="text" id="mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Verificar</button>
+      <button type="button" id="mfa-cancel" class="btn btn-outline" style="margin-top:10px">Cancelar</button>
     </form>
 
     <p class="auth-switch" id="auth-switch-row">
@@ -468,6 +479,26 @@
           <input type="password" id="profile-new-password-confirm" placeholder="Repite la contraseña" autocomplete="new-password" />
         </div>
         <button type="button" class="btn btn-primary" id="change-password-btn" style="margin-top:12px">Cambiar contraseña</button>
+      </div>
+
+      <div class="profile-card" id="mfa-card">
+        <h3 class="profile-card-title">Verificación en dos pasos</h3>
+        <p class="profile-sub" id="mfa-status">Comprobando…</p>
+
+        <div id="mfa-enroll-area" class="hidden">
+          <div class="mfa-qr" id="mfa-qr"></div>
+          <p class="profile-sub">Escanea el código con Google Authenticator, Microsoft Authenticator o cualquier app TOTP.</p>
+          <p class="mfa-secret">Clave manual: <code id="mfa-secret"></code></p>
+          <div class="field">
+            <label for="mfa-enroll-code">Código de 6 dígitos</label>
+            <input type="text" id="mfa-enroll-code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="123456" />
+          </div>
+          <button type="button" class="btn btn-primary" id="mfa-enroll-verify">Confirmar y activar</button>
+          <button type="button" class="btn btn-outline" id="mfa-enroll-cancel" style="margin-top:10px">Cancelar</button>
+        </div>
+
+        <button type="button" class="btn btn-outline" id="mfa-enroll-btn">Activar verificación en dos pasos</button>
+        <button type="button" class="btn btn-outline" id="mfa-disable-btn" style="margin-top:10px">Desactivar verificación en dos pasos</button>
       </div>
 
       <button type="button" class="btn btn-outline" id="signout-btn" style="margin-bottom:20px">Cerrar sesión</button>

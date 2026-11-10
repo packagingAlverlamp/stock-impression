@@ -241,12 +241,26 @@ en el servidor y no solo en el formulario.
     visible, `Html5Qrcode` se inicializa y la CSP bloquea scripts inline y
     `onerror` inyectados. `npm audit`: 0 vulnerabilidades.
   - Informe completo en `SEGURIDAD.md`.
+- Correcciones de seguridad pendientes (10/11/2026):
+  - MFA TOTP opcional por cuenta: activación con QR y clave manual desde
+    Perfil, verificación con `mfa.challengeAndVerify`, baja con `unenroll`, y
+    reto AAL2 en el acceso (`#form-mfa`) solo si la cuenta tiene un factor
+    verificado. `enterApp()` protegido contra cargas duplicadas.
+  - Contraseñas mínimo 10 (Management API) y `minlength`/mensajes del cliente
+    alineados. `security_update_password_require_reauthentication=true` y el
+    error `reauthentication_needed` se traduce a un mensaje claro en el
+    cambio de contraseña.
+  - `.github/dependabot.yml` con revisión semanal de `npm` (agrupada
+    minor/patch).
+  - HIBP (contraseñas filtradas) **no se puede activar**: la API devuelve
+    HTTP 402 (“available on Pro Plans and up”).
 
 ### Pendiente
 
-- Activar MFA TOTP en Supabase y valorar exigirlo a quien gestione pedidos.
-- Subir el mínimo de contraseña a 10 y activar la comprobación de contraseñas
-  filtradas en Supabase Auth.
+- Activar la verificación en dos pasos en las cuentas que gestionan pedidos y
+  valorar exigirla en el proyecto.
+- Valorar subir a Supabase Pro para activar la protección de contraseñas
+  filtradas (HIBP), bloqueada hoy con HTTP 402.
 - Restringir en el panel de EmailJS el dominio permitido a
   `stock-impresion.vercel.app`.
 - Revisar la retención de backups de Supabase y probar una restauración.

@@ -118,6 +118,50 @@ pestañas en segundo plano) y hay un temporizador de 6 s que muestra el acceso
 aunque Supabase no responda. Evita quedarse con la pantalla en blanco por un
 fallo de red.
 
+### 2.6 Verificación en dos pasos (MFA TOTP)
+
+La app incluye un flujo completo de segundo factor, **opcional por cuenta**:
+
+- **Activación desde Perfil**: botón “Activar verificación en dos pasos”,
+  `mfa.enroll({ factorType: 'totp' })`, QR y clave manual, verificación del
+  código de 6 dígitos con `mfa.challengeAndVerify` y estado visible.
+- **Baja desde Perfil**: `mfa.unenroll` con confirmación previa.
+- **Reto en el acceso**: tras el login, `mfa.getAuthenticatorAssuranceLevel()`
+  comprueba si la sesión está en AAL1 con un factor verificado pendiente. Si
+  es así, `app.js` muestra el formulario `#form-mfa` y no deja entrar hasta
+  verificar el código (AAL2). Sin factor verificado no se muestra nada, así
+  que quien no la active no cambia su forma de entrar.
+- El factor se identifica también con `mfa.listFactors()` si el objeto de
+  sesión no lo trae, y si no se puede resolver se cierra la sesión en lugar de
+  permitir la entrada.
+- `enterApp()` está protegido con un flag para evitar cargas duplicadas cuando
+  Supabase emite varios eventos de auth.
+
+> Para exigirla a todo el equipo, el siguiente paso es activarla en cada
+> cuenta y, si se quiere forzar, marcar el factor como obligatorio en el
+> proyecto (hoy es opcional por diseño para no bloquear al resto).
+
+### 2.7 Política de contraseñas
+
+Aplicada vía Management API del proyecto:
+
+- `password_min_length = 10` (antes 6).
+- `security_update_password_require_reauthentication = true`: cambiar la
+  contraseña exige una sesión reciente. La app traduce el error
+  `reauthentication_needed` a un mensaje claro (“cierra sesión y vuelve a
+  entrar”).
+- Formularios y validaciones del cliente alineados a 10 caracteres
+  (`minlength` en `index.html` y mensajes en `app.js`).
+- **Protección de contraseñas filtradas (HIBP): no disponible.** La API
+  responde HTTP 402: “available on Pro Plans and up”. Queda pendiente si se
+  sube de plan.
+
+### 2.8 Dependencias
+
+`.github/dependabot.yml` revisa `npm` cada lunes (zona Europe/Madrid) y agrupa
+minor/patch. Las librerías del navegador de `public/vendor/` no se actualizan
+solas: se sustituyen a mano y se comprueba la CSP.
+
 ---
 
 ## 3. Comprobaciones realizadas
@@ -139,6 +183,10 @@ fallo de red.
   no se ejecuta en navegadores modernos; no requiere `'unsafe-eval'`.
 - Bucket de fotos privado, con límite de 5 MB, MIME permitidos y URLs
   firmadas de 24 h.
+- Flujo MFA probado en local: el formulario `#form-mfa` sustituye al login,
+  vuelve correctamente al login al cancelar, la tarjeta de Perfil muestra el
+  estado y oculta sus acciones si no hay sesión, y una imagen `data:` (el QR)
+  carga bajo la CSP.
 - Triggers de stock y de historial con `security definer`,
   `search_path` fijado y `execute` revocado a `public/anon/authenticated`.
 - Migración aplicada y verificada con `supabase migration list --linked`.
@@ -147,7 +195,9 @@ fallo de red.
 
 ## 4. Modelo de seguridad actual
 
-1. **Autenticación:** Supabase Auth con email/confirmación activada.
+1. **Autenticación:** Supabase Auth con email/confirmación activada, mínimo de
+   10 caracteres, reautenticación para cambiar contraseña y MFA TOTP opcional
+   por cuenta (reto AAL2 en el acceso si está activada).
 2. **Autorización:** RLS en todas las tablas + política restrictiva de
    dominio. Todo empleado autenticado `@alverlamp.es` es de confianza y puede
    ver/editar el inventario compartido (modelo acordado).
@@ -164,11 +214,11 @@ fallo de red.
 | Prioridad | Riesgo | Recomendación |
 | --- | --- | --- |
 | Alta | Clave pública de EmailJS reutilizable desde otro sitio | En EmailJS, restringir el dominio permitido a `stock-impresion.vercel.app`; si se quiere eliminar el abuso, mover el envío al servidor con la clave privada |
-| Alta | Sin segundo factor en cuentas con acceso a todo el inventario | Activar MFA TOTP en Supabase y exigirlo a quien gestione pedidos/proveedores |
-| Media | Contraseñas de 6 caracteres | Subir el mínimo a 10 en Supabase Auth y activar la comprobación de contraseñas filtradas (HaveIBeenPwned) |
+| Media | MFA disponible pero opcional | Activar la verificación en dos pasos en las cuentas que gestionan pedidos y proveedores; valorar forzarla en el proyecto |
+| Baja | Protección de contraseñas filtradas (HIBP) | No disponible en el plan actual (HTTP 402). Subir a Pro y activarla |
 | Media | Sin copias de seguridad verificadas | Confirmar la retención de backups del plan de Supabase y probar una restauración |
 | Media | Sin alertas de accesos anómalos | Revisar periódicamente los logs de Auth y activar alertas de errores en Vercel |
-| Media | Dependencias sin revisión periódica | Activar Dependabot o ejecutar `npm audit` mensualmente; actualizar `vendor/` con intención |
+| Baja | Librerías del navegador con versión fija | Dependabot cubre `npm`; revisar `public/vendor/` a mano cuando toque |
 | Baja | Sin rate limit propio en `/api/*` | Ya hay secretos y límites de Supabase; si se abre a más gente, añadir Vercel Firewall o rate limit por IP |
 | Baja | Sin CAPTCHA en el registro | Solo necesario si el dominio deja de estar cerrado o se detecta abuso |
 | Baja | `sedGrid.pages` y ficheros sueltos en el repo | No se sirven, pero conviene eliminarlos para reducir superficie |

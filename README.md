@@ -262,6 +262,11 @@ están en **[`SEGURIDAD.md`](SEGURIDAD.md)**.
   persona confirma el correo. Esto evita que alguien se registre con una
   dirección `@alverlamp.es` que no controla. Revisa la Site URL y el SMTP en
   **Authentication** antes de usar la app en producción.
+- **Contraseñas y MFA**: el proyecto exige un mínimo de 10 caracteres y
+  reautenticación para cambiar la contraseña. La app incluye verificación en
+  dos pasos (TOTP) **opcional** por cuenta: se activa desde **Mi perfil** con
+  un QR y, a partir de ahí, el acceso pide el código de 6 dígitos. Sin factor
+  verificado el login no cambia. Los detalles están en `SEGURIDAD.md`.
 - **RLS e inventario compartido**: cualquier persona con cuenta corporativa
   puede ver y modificar el inventario, los proveedores y las máquinas. Mantén
   el registro restringido y revisa periódicamente quién tiene cuenta.

@@ -15,6 +15,9 @@ document.body.classList.add("booting", "auth-mode");
 
 let currentUser = null;
 let currentProfile = null;
+let mfaFactorId = null;
+let mfaChallengeActive = false;
+let enteringApp = false;
 let allProducts = [];
 let allSuppliers = [];
 let allProfiles = [];
@@ -177,6 +180,18 @@ function showAuthError(msg) {
   el.classList.remove("hidden");
 }
 
+function passwordErrorMessage(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+  if (code.includes("reauthentication") || message.includes("reauthentication")) {
+    return "Por seguridad, cierra sesión y vuelve a entrar antes de cambiar la contraseña.";
+  }
+  if (message.includes("weak") || message.includes("password")) {
+    return "La contraseña no cumple la política de seguridad. Usa al menos 10 caracteres.";
+  }
+  return error?.message || "Error desconocido";
+}
+
 function setAuthMode(enabled) {
   document.body.classList.toggle("auth-mode", enabled);
   if (!enabled) document.body.classList.remove("booting");
@@ -192,6 +207,10 @@ function showLoginForms() {
   $("form-login").classList.remove("hidden");
   $("form-register").classList.add("hidden");
   $("form-reset-password").classList.add("hidden");
+  $("form-mfa").classList.add("hidden");
+  $("mfa-code").value = "";
+  mfaFactorId = null;
+  mfaChallengeActive = false;
   $("auth-switch-row").classList.remove("hidden");
   $("switch-to-register-wrap").classList.remove("hidden");
   $("switch-to-login-wrap").classList.add("hidden");
@@ -203,6 +222,10 @@ function showRecoveryForm() {
   $("form-login").classList.add("hidden");
   $("form-register").classList.add("hidden");
   $("form-reset-password").classList.remove("hidden");
+  $("form-mfa").classList.add("hidden");
+  $("mfa-code").value = "";
+  mfaFactorId = null;
+  mfaChallengeActive = false;
   $("auth-switch-row").classList.add("hidden");
   $("switch-to-register-wrap").classList.add("hidden");
   $("switch-to-login-wrap").classList.add("hidden");
@@ -210,6 +233,107 @@ function showRecoveryForm() {
   const input = $("reset-password");
   if (input) setTimeout(() => input.focus(), 50);
 }
+
+// ---------------------------------------------------------------
+// Verificación en dos pasos (MFA TOTP)
+// ---------------------------------------------------------------
+async function mfaRequired() {
+  const { data, error } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (error) return false;
+  return data?.nextLevel === "aal2" && data?.currentLevel !== "aal2";
+}
+
+function showMfaForm(factorId) {
+  mfaFactorId = factorId;
+  mfaChallengeActive = true;
+  setAuthMode(true);
+  $("app").classList.add("hidden");
+  $("view-auth").classList.remove("hidden");
+  $("form-login").classList.add("hidden");
+  $("form-register").classList.add("hidden");
+  $("form-reset-password").classList.add("hidden");
+  $("form-mfa").classList.remove("hidden");
+  $("auth-switch-row").classList.add("hidden");
+  $("switch-to-register-wrap").classList.add("hidden");
+  $("switch-to-login-wrap").classList.add("hidden");
+  $("auth-error").classList.add("hidden");
+  finishBoot();
+  setTimeout(() => $("mfa-code")?.focus(), 50);
+}
+
+async function handleSession(session) {
+  if (!session?.user) {
+    currentUser = null;
+    setAuthMode(true);
+    $("app").classList.add("hidden");
+    $("view-auth").classList.remove("hidden");
+    showLoginForms();
+    finishBoot();
+    return;
+  }
+
+  currentUser = session.user;
+
+  if (await mfaRequired()) {
+    let factor = (session.user.factors || []).find((item) => item.status === "verified");
+    if (!factor) {
+      const { data } = await supabaseClient.auth.mfa.listFactors();
+      factor = (data?.totp || []).find((item) => item.status === "verified");
+    }
+    if (factor) {
+      showMfaForm(factor.id);
+    } else {
+      await supabaseClient.auth.signOut();
+      showToast("No se pudo completar la verificación en dos pasos. Vuelve a iniciar sesión.", 6000);
+    }
+    return;
+  }
+
+  mfaChallengeActive = false;
+  await enterApp();
+}
+
+$("form-mfa").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("auth-error").classList.add("hidden");
+  const code = $("mfa-code").value.trim();
+
+  if (!/^\d{6}$/.test(code)) {
+    showAuthError("Escribe el código de 6 dígitos de tu aplicación de autenticación.");
+    return;
+  }
+
+  if (!mfaFactorId) {
+    showAuthError("No se ha podido identificar el método de verificación. Vuelve a iniciar sesión.");
+    return;
+  }
+
+  const button = e.target.querySelector('button[type="submit"]');
+  await withBusy(button, "Verificando…", async () => {
+    const { error } = await supabaseClient.auth.mfa.challengeAndVerify({
+      factorId: mfaFactorId,
+      code,
+    });
+
+    if (error) {
+      showAuthError("Código incorrecto o caducado. Inténtalo de nuevo.");
+      return;
+    }
+
+    $("mfa-code").value = "";
+    mfaChallengeActive = false;
+    await enterApp();
+  });
+});
+
+$("mfa-cancel").addEventListener("click", async () => {
+  const button = $("mfa-cancel");
+  await withBusy(button, "Saliendo…", async () => {
+    mfaFactorId = null;
+    mfaChallengeActive = false;
+    await supabaseClient.auth.signOut();
+  });
+});
 
 $("forgot-password-link").addEventListener("click", async () => {
   const email = $("login-email").value.trim();
@@ -241,8 +365,8 @@ $("form-reset-password").addEventListener("submit", async (e) => {
   const newPassword = $("reset-password").value.trim();
   const passwordConfirm = $("reset-password-confirm").value.trim();
 
-  if (!newPassword || newPassword.length < 6) {
-    showAuthError("La nueva contraseña debe tener al menos 6 caracteres.");
+  if (!newPassword || newPassword.length < 10) {
+    showAuthError("La nueva contraseña debe tener al menos 10 caracteres.");
     return;
   }
 
@@ -255,7 +379,7 @@ $("form-reset-password").addEventListener("submit", async (e) => {
   await withBusy(button, "Guardando…", async () => {
     const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
     if (error) {
-      showAuthError("No se pudo guardar la nueva contraseña: " + error.message);
+      showAuthError("No se pudo guardar la nueva contraseña: " + passwordErrorMessage(error));
       return;
     }
 
@@ -326,8 +450,8 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
   }
 
   if (session && session.user) {
-    currentUser = session.user;
-    enterApp();
+    // Fuera del callback para no bloquear las llamadas internas de auth.
+    setTimeout(() => { handleSession(session); }, 0);
   } else {
     currentUser = null;
     setAuthMode(true);
@@ -350,20 +474,26 @@ function safeRenderInventoryState() {
 }
 
 async function enterApp() {
-  setAuthMode(false);
-  $("view-auth").classList.add("hidden");
-  $("app").classList.remove("hidden");
-  await loadProfile();
-  await loadProfiles();
-  await loadSuppliers();
-  await loadMachines();
-  await loadProducts();
-  safeRenderInventoryState();
-  showView("list");
-  requestAnimationFrame(() => {
-    renderCategoryPills();
-    renderProductList();
-  });
+  if (mfaChallengeActive || enteringApp) return;
+  enteringApp = true;
+  try {
+    setAuthMode(false);
+    $("view-auth").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    await loadProfile();
+    await loadProfiles();
+    await loadSuppliers();
+    await loadMachines();
+    await loadProducts();
+    safeRenderInventoryState();
+    showView("list");
+    requestAnimationFrame(() => {
+      renderCategoryPills();
+      renderProductList();
+    });
+  } finally {
+    enteringApp = false;
+  }
 }
 
 // ---------------------------------------------------------------
@@ -559,7 +689,131 @@ function renderProfile() {
   if (!currentProfile) return;
   $("profile-email").textContent = currentProfile.email;
   $("notify-toggle").checked = !!currentProfile.notify_low_stock;
+  loadMfaState();
 }
+
+// ---------------------------------------------------------------
+// Gestión de la verificación en dos pasos desde el perfil
+// ---------------------------------------------------------------
+let mfaEnrollFactorId = null;
+
+async function loadMfaState() {
+  const statusEl = $("mfa-status");
+  if (!statusEl) return;
+
+  const { data, error } = await supabaseClient.auth.mfa.listFactors();
+  if (error) {
+    statusEl.textContent = "No se pudo comprobar el estado de la verificación en dos pasos.";
+    $("mfa-enroll-btn").classList.add("hidden");
+    $("mfa-disable-btn").classList.add("hidden");
+    return;
+  }
+
+  const verified = (data?.totp || []).filter((factor) => factor.status === "verified");
+  const active = verified.length > 0;
+
+  statusEl.textContent = active
+    ? "Activada. Al entrar se te pedirá un código de tu aplicación de autenticación."
+    : "Desactivada. Actívala para proteger tu cuenta con un código adicional.";
+
+  $("mfa-enroll-btn").classList.toggle("hidden", active);
+  $("mfa-disable-btn").classList.toggle("hidden", !active);
+  $("mfa-disable-btn").dataset.factorId = active ? verified[0].id : "";
+  if (!active) resetMfaEnrollArea();
+}
+
+function resetMfaEnrollArea() {
+  mfaEnrollFactorId = null;
+  $("mfa-enroll-area").classList.add("hidden");
+  $("mfa-qr").innerHTML = "";
+  $("mfa-secret").textContent = "";
+  $("mfa-enroll-code").value = "";
+}
+
+$("mfa-enroll-btn").addEventListener("click", async () => {
+  const button = $("mfa-enroll-btn");
+  await withBusy(button, "Preparando…", async () => {
+    const { data: existing } = await supabaseClient.auth.mfa.listFactors();
+    const stale = (existing?.all || []).filter((factor) => factor.status === "unverified");
+    await Promise.all(stale.map((factor) =>
+      supabaseClient.auth.mfa.unenroll({ factorId: factor.id })
+    ));
+
+    const { data, error } = await supabaseClient.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: `Stock Impresión · ${currentProfile?.email || currentUser?.email || "cuenta"}`,
+    });
+
+    if (error || !data?.totp) {
+      showToast("No se pudo iniciar la activación: " + (error?.message || "error desconocido"));
+      return;
+    }
+
+    mfaEnrollFactorId = data.id;
+    $("mfa-secret").textContent = data.totp.secret;
+    $("mfa-qr").innerHTML = `<img src="${escapeHtml(data.totp.qr_code)}" alt="Código QR para la verificación en dos pasos" />`;
+    $("mfa-enroll-area").classList.remove("hidden");
+    $("mfa-enroll-code").value = "";
+    $("mfa-enroll-code").focus();
+  });
+});
+
+$("mfa-enroll-verify").addEventListener("click", async () => {
+  const code = $("mfa-enroll-code").value.trim();
+  if (!mfaEnrollFactorId) {
+    showToast("La activación ha caducado. Vuelve a empezar.");
+    resetMfaEnrollArea();
+    return;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    showToast("Escribe el código de 6 dígitos que muestra la app.");
+    return;
+  }
+
+  const button = $("mfa-enroll-verify");
+  await withBusy(button, "Verificando…", async () => {
+    const { error } = await supabaseClient.auth.mfa.challengeAndVerify({
+      factorId: mfaEnrollFactorId,
+      code,
+    });
+
+    if (error) {
+      showToast("Código incorrecto o caducado. Inténtalo de nuevo.");
+      return;
+    }
+
+    resetMfaEnrollArea();
+    showToast("Verificación en dos pasos activada");
+    loadMfaState();
+  });
+});
+
+$("mfa-enroll-cancel").addEventListener("click", async () => {
+  const factorId = mfaEnrollFactorId;
+  resetMfaEnrollArea();
+  if (factorId) {
+    await supabaseClient.auth.mfa.unenroll({ factorId });
+  }
+  loadMfaState();
+});
+
+$("mfa-disable-btn").addEventListener("click", async () => {
+  const factorId = $("mfa-disable-btn").dataset.factorId;
+  if (!factorId) return;
+  if (!confirm("¿Desactivar la verificación en dos pasos? Tu cuenta quedará protegida solo con la contraseña.")) return;
+
+  const button = $("mfa-disable-btn");
+  await withBusy(button, "Desactivando…", async () => {
+    const { error } = await supabaseClient.auth.mfa.unenroll({ factorId });
+    if (error) {
+      showToast("No se pudo desactivar: " + error.message);
+      return;
+    }
+    showToast("Verificación en dos pasos desactivada");
+    loadMfaState();
+  });
+});
+
 
 $("notify-toggle").addEventListener("change", async (e) => {
   const checked = e.target.checked;
@@ -580,8 +834,8 @@ $("change-password-btn").addEventListener("click", async () => {
   const newPassword = $("profile-new-password").value.trim();
   const passwordConfirm = $("profile-new-password-confirm").value.trim();
 
-  if (!newPassword || newPassword.length < 6) {
-    showToast("La contraseña debe tener al menos 6 caracteres");
+  if (!newPassword || newPassword.length < 10) {
+    showToast("La contraseña debe tener al menos 10 caracteres");
     return;
   }
 
@@ -594,7 +848,7 @@ $("change-password-btn").addEventListener("click", async () => {
   await withBusy(button, "Guardando…", async () => {
     const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
     if (error) {
-      showToast("No se pudo cambiar la contraseña: " + error.message);
+      showToast("No se pudo cambiar la contraseña: " + passwordErrorMessage(error), 6000);
       return;
     }
 
