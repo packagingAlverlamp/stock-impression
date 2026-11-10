@@ -2005,6 +2005,12 @@ nav.tabbar svg { width: 21px; height: 21px; }
     margin-right: 0;
   }
 
+  /* La vista de Taller ocupa todo el ancho: deja aire a la derecha
+     para que las tarjetas no toquen el borde del panel. */
+  #view-machines {
+    padding-right: 16px;
+  }
+
   main.view {
     width: calc(100% - 32px);
     max-width: 1100px;

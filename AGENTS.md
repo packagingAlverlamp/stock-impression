@@ -261,6 +261,8 @@ en el servidor y no solo en el formulario.
     `align-items: start`). Por debajo de 1100 px sigue apilado como antes.
   - La cabecera de Máquinas (título + “Nueva máquina”) va dentro de su columna
     y el título de Solicitudes se alinea a la misma altura.
+  - En escritorio `#view-machines` lleva `padding-right: 16px` (antes 0) para
+    que la columna derecha no toque el borde del panel ni recorte la tarjeta.
   - Verificado con medidas reales: 390/500 px una columna sin desbordamiento,
     900 px una columna de 535 px, 1100 px dos de 353 px, 1440 px dos de 524 px.
 - Build de previews de Vercel (10/11/2026):
