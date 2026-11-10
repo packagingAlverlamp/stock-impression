@@ -589,16 +589,14 @@ main.view:not(.hidden) {
 .analysis-footnote { max-width: none; line-height: 1.5; }
 
 /* ---------- Análisis: consumo por máquina ---------- */
-/* Texto y aviso de riesgo en dos columnas: en escritorio no se apilan dos
-   bloques de altura antes de llegar a las tarjetas. */
-.analysis-top {
+/* Aviso de historial y aviso de riesgo en la misma fila, debajo de la intro. */
+.analysis-alerts {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px 24px;
   margin-bottom: 4px;
 }
-.analysis-top-copy .page-intro { max-width: none; margin-top: 0; }
-.analysis-top .analysis-notice { max-width: none; margin-bottom: 0; }
+.analysis-alerts .analysis-notice { max-width: none; margin-bottom: 0; }
 .analysis-risk {
   display: flex;
   flex-wrap: wrap;
@@ -617,18 +615,44 @@ main.view:not(.hidden) {
 .analysis-machines-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
+  gap: 4px;
   margin: 24px 0 14px;
 }
 .analysis-machines-head .analysis-machines-title { margin: 0; }
 .analysis-machines-head .analysis-machines-intro { margin: 0; max-width: 780px; }
+.analysis-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.analysis-period select {
+  width: auto;
+  min-width: 180px;
+  min-height: 38px;
+  padding: 8px 38px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
 
 .analysis-machines {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 26px;
+}
+@media (min-width: 1100px) {
+  /* Todas las máquinas en la misma fila cuando caben con un mínimo legible. */
+  .analysis-machines {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
 }
 .analysis-empty {
   margin: 0 0 22px;
@@ -758,30 +782,17 @@ main.view:not(.hidden) {
 .machine-analysis-next strong { color: var(--ink); }
 
 @media (min-width: 1100px) {
-  .analysis-top.has-risk {
+  .analysis-alerts.has-risk {
     grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
-    align-items: start;
+    align-items: stretch;
   }
   .analysis-machines-head {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: baseline;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
     gap: 28px;
   }
   .analysis-machines-head .analysis-machines-intro { max-width: none; }
-
-  /* Una fila por suministro: nombre, stock, barra, fecha y acción. */
-  .machine-supply {
-    grid-template-columns: minmax(130px, 1fr) auto minmax(80px, 140px) auto minmax(0, 1.6fr);
-    grid-template-areas: "name stock bar when note";
-    align-items: center;
-    gap: 8px 14px;
-    padding: 8px 0;
-  }
-  .machine-supply:first-child { padding-top: 4px; }
-  .machine-supply-bar { margin: 0; }
-  .machine-supply-stock { text-align: left; }
-  .machine-supply-when { white-space: nowrap; }
-  .machine-supply-note { text-align: left; }
+  .analysis-period { margin-top: 0; }
 }
 .name-prefix-filters {
   display: flex;

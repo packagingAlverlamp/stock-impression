@@ -394,14 +394,21 @@ en el servidor y no solo en el formulario.
   - La tabla inferior usa el mismo cálculo: “Ritmo de consumo” (media diaria;
     se muestra como “1 cada N días” cuando es menor que 1) y “Se agota”
     (fecha + días). Se ordena por la fecha de agotamiento.
-  - **Ancho completo en escritorio (≥1100 px)**: la intro y el aviso de riesgo
-    van en dos columnas, la cabecera “Consumo por máquina” va en una sola
-    línea, cada máquina ocupa una tarjeta a todo el ancho y cada suministro se
-    muestra en una fila (nombre, stock, barra, fecha y acción). En móvil el
-    suministro vuelve a dos líneas.
+  - **Filtro de periodo**: “Últimos 30 días” por defecto, “Últimos 90 días”,
+    “Último año” o “Todo el historial”. Afecta al ritmo, a la fecha de
+    agotamiento y a las columnas Entradas, Salidas y Agotamientos de la tabla.
+    La tendencia compara el periodo elegido con el anterior de la misma
+    duración.
+  - **Ancho completo en escritorio (≥1100 px)**: la intro queda arriba; los
+    avisos de historial y de riesgo comparten fila con la misma altura; la
+    cabecera “Consumo por máquina” lleva el selector de periodo a la derecha y
+    todas las máquinas caben en una sola fila. Dentro de cada tarjeta el
+    suministro ocupa dos líneas (nombre y stock, barra, fecha y acción); en
+    móvil se apilan los avisos, la cabecera y las tarjetas.
   - Todo se calcula en el navegador con los movimientos ya cargados; sin
     tablas ni migraciones nuevas.
-  - Verificado con datos simulados a 1440 y 500 px, sin errores de consola.
+  - Verificado con datos simulados a 1440, 1100 y 500 px, sin errores de
+    consola.
 
 ### Pendiente
 

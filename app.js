@@ -634,9 +634,19 @@ function openMoreMenu() {
 
 
 let activeAnalyticsSection = "analytics";
+let analysisPeriodDays = 30;
 document.querySelectorAll(".analytics-view-btn").forEach((button) => {
   button.addEventListener("click", () => showAnalyticsSection(button.dataset.analyticsView));
 });
+
+const analysisPeriodSelect = $("analysis-period");
+if (analysisPeriodSelect) {
+  analysisPeriodSelect.value = String(analysisPeriodDays);
+  analysisPeriodSelect.addEventListener("change", () => {
+    analysisPeriodDays = Number(analysisPeriodSelect.value) || 0;
+    if (activeAnalyticsSection === "analytics") loadStockAnalytics();
+  });
+}
 
 function showAnalyticsSection(name) {
   activeAnalyticsSection = name;
@@ -1231,49 +1241,65 @@ async function loadSupplierLeadTimes() {
   return leadTimes;
 }
 
-function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
+function buildSupplyForecast(product, withdrawals, now, leadTimeDays, periodDays = 0) {
   const quantity = Number(product.quantity) || 0;
   const activeDayKeys = new Set(withdrawals.map((movement) => analysisDayKey(movement.created_at)));
-  const totalWithdrawn = withdrawals.reduce((sum, movement) => sum + Math.max(0, -Number(movement.quantity_delta)), 0);
-  const firstWithdrawalAt = withdrawals.length
-    ? new Date(withdrawals[0].created_at).getTime()
+  const windowStart = periodDays > 0 ? now.getTime() - periodDays * 86400000 : null;
+  const periodWithdrawals = windowStart === null
+    ? withdrawals
+    : withdrawals.filter((movement) => new Date(movement.created_at).getTime() >= windowStart);
+  const totalWithdrawn = periodWithdrawals.reduce((sum, movement) => sum + Math.max(0, -Number(movement.quantity_delta)), 0);
+  const firstWithdrawalAt = periodWithdrawals.length
+    ? new Date(periodWithdrawals[0].created_at).getTime()
     : null;
-  // El ritmo se mide por día de calendario desde la primera salida. Antes se
-  // dividía solo entre los días con salida y una única retirada se convertía
-  // en “1 al día”, con fechas y cantidades absurdas.
+  // El ritmo se mide por día de calendario desde la primera salida del periodo.
+  // Antes se dividía solo entre los días con salida y una única retirada se
+  // convertía en “1 al día”, con fechas y cantidades absurdas.
   const daysSinceFirst = firstWithdrawalAt === null
     ? 0
     : Math.max(1, (now.getTime() - firstWithdrawalAt) / 86400000);
   const hasEnoughData = firstWithdrawalAt !== null
     && daysSinceFirst >= ANALYSIS_MIN_OBSERVATION_DAYS
-    && (withdrawals.length >= 2 || daysSinceFirst >= ANALYSIS_SINGLE_MOVEMENT_DAYS);
-  const observedDays = Math.max(ANALYSIS_MIN_OBSERVATION_DAYS, daysSinceFirst);
-  const rateOverall = hasEnoughData ? totalWithdrawn / observedDays : 0;
+    && (periodWithdrawals.length >= 2 || daysSinceFirst >= ANALYSIS_SINGLE_MOVEMENT_DAYS);
+  const observedDays = periodDays > 0
+    ? Math.min(periodDays, Math.max(ANALYSIS_MIN_OBSERVATION_DAYS, daysSinceFirst))
+    : Math.max(ANALYSIS_MIN_OBSERVATION_DAYS, daysSinceFirst);
+  const rate = hasEnoughData ? totalWithdrawn / observedDays : 0;
 
-  const recentFrom = now.getTime() - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
-  const previousFrom = now.getTime() - 2 * ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
-  const recentWindowDays = Math.min(ANALYSIS_RECENT_WINDOW_DAYS, observedDays);
-  let recentUnits = 0;
+  // Tendencia: el periodo elegido frente al periodo anterior de la misma
+  // duración. Con “todo el historial” se comparan los últimos 30 días.
+  let recentUnits = totalWithdrawn;
+  let recentCount = periodWithdrawals.length;
   let previousUnits = 0;
-  let recentCount = 0;
   let previousCount = 0;
 
-  withdrawals.forEach((movement) => {
-    const time = new Date(movement.created_at).getTime();
-    const units = Math.max(0, -Number(movement.quantity_delta));
-    if (time >= recentFrom) {
-      recentUnits += units;
-      recentCount += 1;
-    } else if (time >= previousFrom) {
-      previousUnits += units;
-      previousCount += 1;
-    }
-  });
+  if (windowStart !== null) {
+    const previousStart = windowStart - periodDays * 86400000;
+    withdrawals.forEach((movement) => {
+      const time = new Date(movement.created_at).getTime();
+      if (time >= previousStart && time < windowStart) {
+        previousUnits += Math.max(0, -Number(movement.quantity_delta));
+        previousCount += 1;
+      }
+    });
+  } else {
+    const recentFrom = now.getTime() - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+    const previousFrom = recentFrom - ANALYSIS_RECENT_WINDOW_DAYS * 86400000;
+    recentUnits = 0;
+    recentCount = 0;
+    withdrawals.forEach((movement) => {
+      const time = new Date(movement.created_at).getTime();
+      const units = Math.max(0, -Number(movement.quantity_delta));
+      if (time >= recentFrom) {
+        recentUnits += units;
+        recentCount += 1;
+      } else if (time >= previousFrom) {
+        previousUnits += units;
+        previousCount += 1;
+      }
+    });
+  }
 
-  const rateRecent = hasEnoughData && recentWindowDays > 0
-    ? recentUnits / recentWindowDays
-    : 0;
-  const rate = rateRecent > 0 ? rateRecent : rateOverall;
   const coverageDays = rate > 0 ? quantity / rate : null;
   const depletionDate = coverageDays === null ? null : new Date(now.getTime() + coverageDays * 86400000);
   const reorderDate = depletionDate
@@ -1287,7 +1313,6 @@ function buildSupplyForecast(product, withdrawals, now, leadTimeDays) {
   return {
     product,
     rate,
-    rateOverall,
     hasEnoughData,
     observedDays,
     coverageDays,
@@ -1399,8 +1424,8 @@ function renderMachineAnalysis(forecasts, now) {
     });
 
   if (riskBox) {
-    const topBox = riskBox.closest(".analysis-top");
-    if (topBox) topBox.classList.toggle("has-risk", lateSupplies.length > 0);
+    const alertsBox = riskBox.closest(".analysis-alerts");
+    if (alertsBox) alertsBox.classList.toggle("has-risk", lateSupplies.length > 0);
     if (lateSupplies.length) {
       const names = lateSupplies.slice(0, 4).map((forecast) => {
         const quantity = Number(forecast.product.quantity) || 0;
@@ -1585,6 +1610,13 @@ async function loadStockAnalytics() {
     }
 
     const now = new Date();
+    const periodStart = analysisPeriodDays > 0
+      ? now.getTime() - analysisPeriodDays * 86400000
+      : null;
+    const periodMovements = periodStart === null
+      ? movements
+      : movements.filter((movement) => new Date(movement.created_at).getTime() >= periodStart);
+
     const withdrawalsByProduct = new Map();
     movements.forEach((movement) => {
       if (movement.movement_type !== "withdrawal") return;
@@ -1597,9 +1629,10 @@ async function loadStockAnalytics() {
       product,
       withdrawalsByProduct.get(product.id) || [],
       now,
-      leadTimes.get(product.supplier_id || "__none__") ?? ANALYSIS_DEFAULT_LEAD_TIME
+      leadTimes.get(product.supplier_id || "__none__") ?? ANALYSIS_DEFAULT_LEAD_TIME,
+      analysisPeriodDays
     ));
-    const stats = allProducts.map((product) => buildProductConsumptionStats(product, movements, now));
+    const stats = allProducts.map((product) => buildProductConsumptionStats(product, periodMovements, now));
     const forecastById = new Map(forecasts.map((forecast) => [forecast.product.id, forecast]));
 
     renderMachineAnalysis(forecasts, now);
