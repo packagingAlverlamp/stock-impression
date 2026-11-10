@@ -279,16 +279,20 @@
         <button type="button" class="workshop-tab" data-workshop-view="suppliers" role="tab" aria-selected="false">Proveedores</button>
       </div>
 
-      <div class="section-header">
-        <h2 class="section-title">Maquinaria</h2>
-        <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>
-      </div>
-      <div id="machines-list" class="machines-list"></div>
+      <div class="workshop-machines-grid">
+        <section class="machines-column">
+          <div class="section-header">
+            <h2 class="section-title">Maquinaria</h2>
+            <button type="button" id="new-machine-btn" class="btn btn-teal">Nueva máquina</button>
+          </div>
+          <div id="machines-list" class="machines-list"></div>
+        </section>
 
-      <section class="service-history-section">
-        <h2 class="section-title">Solicitudes de servicio técnico</h2>
-        <div id="service-requests-list" class="service-requests-list"></div>
-      </section>
+        <section class="service-history-section">
+          <h2 class="section-title">Solicitudes de servicio técnico</h2>
+          <div id="service-requests-list" class="service-requests-list"></div>
+        </section>
+      </div>
     </main>
 
     <!-- ---------- Vista: Pedidos ---------- -->

@@ -2534,3 +2534,42 @@ body.auth-mode .auth-switch { margin-top: 22px; }
 .order-cart-main .product-machine {
   margin: 4px 0 0;
 }
+
+/* ---------- Taller: Maquinaria y solicitudes en dos columnas ---------- */
+.workshop-machines-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  width: 100%;
+  min-width: 0;
+}
+
+.workshop-machines-grid > * {
+  min-width: 0;
+}
+
+.workshop-machines-grid .service-history-section {
+  margin-top: 0;
+}
+
+@media (min-width: 1100px) {
+  .workshop-machines-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .workshop-machines-grid .section-header,
+  .workshop-machines-grid .machines-list,
+  .workshop-machines-grid .service-requests-list,
+  .workshop-machines-grid .service-history-section {
+    width: 100%;
+    max-width: none;
+  }
+
+  .workshop-machines-grid .service-history-section > .section-title {
+    display: flex;
+    align-items: center;
+    min-height: 46px;
+    margin: 0 0 18px;
+  }
+}
