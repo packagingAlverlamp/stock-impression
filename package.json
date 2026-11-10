@@ -8,6 +8,6 @@
     "build": "node scripts/generate-config.js && mkdir -p public && cp index.html app.js style.css public/ && mkdir -p public/img && cp -R img/. public/img/"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2"
+    "@supabase/supabase-js": "^2.119.0"
   }
 }
