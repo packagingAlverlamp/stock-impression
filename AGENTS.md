@@ -287,6 +287,11 @@ en el servidor y no solo en el formulario.
   - Escritorio: los botones `.btn` dejan de ocupar todo el ancho del
     contenedor (`width: auto`), salvo en el acceso (`body.auth-mode`).
     Perfil usa `margin: 0 10px 10px 0` para separar botones contiguos.
+  - `#view-service` entra en el grupo de vistas de escritorio con
+    `width: 100%`, `margin 0` y `max-width: none`, y comparte con Máquinas y
+    Proveedores `padding-right: 16px`. Sin esto heredaba de `main.view`
+    (`max-width: 1100px` + `margin: auto`) y el contenido aparecía centrado,
+    a diferencia del resto de vistas.
   - Las tablas de **Análisis** y **Registro de stock** muestran la columna
     **Máquina**. En el registro se resuelve con `machineNameForProductId()`
     a partir de `allProducts`. Colspan actualizado a 9 y 7.

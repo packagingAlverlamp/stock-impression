@@ -2152,16 +2152,19 @@ nav.tabbar svg { width: 21px; height: 21px; }
   #view-add,
   #view-profile,
   #view-suppliers,
-  #view-machines {
+  #view-machines,
+  #view-service {
     max-width: none;
     width: 100%;
     margin-left: 0;
     margin-right: 0;
   }
 
-  /* La vista de Taller ocupa todo el ancho: deja aire a la derecha
-     para que las tarjetas no toquen el borde del panel. */
-  #view-machines {
+  /* Las vistas de Taller ocupan todo el ancho y alinean su contenido a la
+     izquierda, con el mismo aire a la derecha que a la izquierda. */
+  #view-machines,
+  #view-suppliers,
+  #view-service {
     padding-right: 16px;
   }
 
