@@ -46,8 +46,53 @@ function normalizeSupabaseUrl(url) {
   return value;
 }
 
-const supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_URL);
-const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || '').trim();
+const isValidUrl = (value) => /^https?:\/\/[^\s/]+/i.test(value) && !/PEGA_AQUI/i.test(value);
+const isValidKey = (value) => Boolean(value)
+  && value.length >= 20
+  && !/PEGA_AQUI/i.test(value)
+  && !/^https?:\/\//i.test(value);
+
+// Reutiliza el config.js versionado cuando el entorno no trae las variables
+// (previews de Vercel, builds locales sin .env.local). Son valores públicos
+// por diseño; en producción se sigue exigiendo la configuración real.
+function readExistingConfig() {
+  const candidates = [
+    path.join(ROOT, 'config.js'),
+    path.join(ROOT, 'public', 'config.js'),
+  ];
+
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const content = fs.readFileSync(file, 'utf8');
+    const readValue = (name) => {
+      const match = content.match(new RegExp(`const\\s+${name}\\s*=\\s*("(?:[^"\\\\]|\\\\.)*")`));
+      if (!match) return '';
+      try { return JSON.parse(match[1]); } catch (_) { return ''; }
+    };
+
+    const url = normalizeSupabaseUrl(readValue('SUPABASE_URL'));
+    const key = String(readValue('SUPABASE_ANON_KEY') || '').trim();
+    if (isValidUrl(url) && isValidKey(key)) {
+      return { url, key };
+    }
+  }
+
+  return null;
+}
+
+let supabaseUrl = normalizeSupabaseUrl(process.env.SUPABASE_URL);
+let supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || '').trim();
+
+const isProduction = String(process.env.VERCEL_ENV || '').toLowerCase() === 'production';
+
+if ((!isValidUrl(supabaseUrl) || !isValidKey(supabaseAnonKey)) && !isProduction) {
+  const fallback = readExistingConfig();
+  if (fallback) {
+    supabaseUrl = fallback.url;
+    supabaseAnonKey = fallback.key;
+    console.warn('[config] Sin variables de entorno: se reutiliza el config.js versionado.');
+  }
+}
 
 if (!/^https?:\/\/[^\s/]+/i.test(supabaseUrl) || /PEGA_AQUI/i.test(supabaseUrl)) {
   fail('SUPABASE_URL no es una URL válida. Revisa .env.local o las variables de Vercel.');
