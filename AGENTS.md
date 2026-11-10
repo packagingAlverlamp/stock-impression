@@ -254,6 +254,17 @@ en el servidor y no solo en el formulario.
     minor/patch).
   - HIBP (contraseñas filtradas) **no se puede activar**: la API devuelve
     HTTP 402 (“available on Pro Plans and up”).
+- Build de previews de Vercel (10/11/2026):
+  - El preview de la rama de Dependabot falló porque `generate-config.js`
+    exigía `SUPABASE_URL`/`SUPABASE_ANON_KEY`, variables que solo están
+    configuradas en Production. No era un problema de la dependencia.
+  - `scripts/generate-config.js` reutiliza ahora el `config.js` versionado
+    cuando faltan las variables y `VERCEL_ENV` no es `production`. Son valores
+    públicos por diseño. En Production se sigue exigiendo la configuración
+    real y el build falla si falta.
+  - Verificado simulando el build sin entorno: preview pasa y producción
+    falla como debe. La rama de Dependabot se actualizó con `main` y su
+    preview vuelve a construir.
 
 ### Pendiente
 
@@ -264,6 +275,8 @@ en el servidor y no solo en el formulario.
 - Restringir en el panel de EmailJS el dominio permitido a
   `stock-impresion.vercel.app`.
 - Revisar la retención de backups de Supabase y probar una restauración.
+- Opcional: añadir `SUPABASE_URL`/`SUPABASE_ANON_KEY` al entorno **Preview**
+  de Vercel (hoy los previews usan el `config.js` versionado).
 - Tras confirmar el nuevo despliegue, eliminar `products.category` con una
   migración posterior.
 - Decidir si se configura SMTP antes de dar de alta empleados nuevos.
